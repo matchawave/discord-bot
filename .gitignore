@@ -1,0 +1,4 @@
+/target
+/.history
+.env
+Cargo.lock

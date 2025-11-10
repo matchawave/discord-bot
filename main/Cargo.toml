@@ -1,0 +1,24 @@
+[package]
+name = "main"
+version = "0.1.0"
+edition = "2024"
+
+[build-dependencies]
+dotenv = "0.15"
+
+[dependencies]
+serenity = { workspace = true }
+chrono = { workspace = true }
+regex = { workspace = true }
+dashmap = { workspace = true }
+colored = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+fastrand = "2.3"
+
+tokio = { workspace = true }
+tokio-tungstenite = { version = "0.27", default-features = false, features = ['rustls', 'connect']}
+rayon = { workspace = true }
+
+utils = { path = "../utils" }
+framework = { path = "../framework" }

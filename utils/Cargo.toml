@@ -1,0 +1,16 @@
+[package]
+name = "utils"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+strum = "0.27"
+strum_macros = "0.27"
+serenity = { workspace = true }
+tokio = { workspace = true }
+chrono = { workspace = true }
+colored = { workspace = true }
+regex = { workspace = true }
+dashmap = { workspace = true }
+rayon = { workspace = true }
+# moka = { workspace = true }

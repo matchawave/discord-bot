@@ -1,0 +1,45 @@
+use serenity::{
+    all::{Context, Event, GuildId, UserId, VoiceState},
+    async_trait,
+};
+use utils::{Parser, Pointer};
+
+use crate::{cached, command::CommandAction, extractors::Extractor};
+
+cached!(VoiceStates, VoiceState, (GuildId, UserId));
+
+#[async_trait]
+impl Extractor<Event> for VoiceState {
+    async fn extract(ctx: &Context, ev: &Event, p: &Pointer<Parser>) -> Option<Self> {
+        let (guild_id, user_id) = get_ids(ctx, ev, p).await?;
+        let voice_states = VoiceStates::extract(ctx, ev, p).await?;
+        fetch_cached(&voice_states, guild_id, user_id).await
+    }
+}
+
+#[async_trait]
+impl Extractor<CommandAction> for VoiceState {
+    async fn extract(ctx: &Context, action: &CommandAction, p: &Pointer<Parser>) -> Option<Self> {
+        let (guild_id, user_id) = get_ids(ctx, action, p).await?;
+        let voice_states = VoiceStates::extract(ctx, action, p).await?;
+        fetch_cached(&voice_states, guild_id, user_id).await
+    }
+}
+
+async fn get_ids<T>(ctx: &Context, ev: &T, p: &Pointer<Parser>) -> Option<(GuildId, UserId)>
+where
+    GuildId: Extractor<T>,
+    UserId: Extractor<T>,
+{
+    let guild_id = GuildId::extract(ctx, ev, p).await?;
+    let user_id = UserId::extract(ctx, ev, p).await?;
+    Some((guild_id, user_id))
+}
+
+async fn fetch_cached(
+    messages: &VoiceStates,
+    guild_id: GuildId,
+    user_id: UserId,
+) -> Option<VoiceState> {
+    messages.get(&(guild_id, user_id)).await.clone()
+}
