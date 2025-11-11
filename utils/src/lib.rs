@@ -5,7 +5,7 @@ mod pagination;
 mod parser;
 mod permissions;
 
-use std::sync::Arc;
+use std::{ops::Deref, sync::Arc};
 
 pub use discord::*;
 pub use legacy::*;
@@ -129,7 +129,7 @@ impl std::fmt::Display for ResponseError {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct MemberData {
     pub is_bot: bool,
     pub join_date: Timestamp,

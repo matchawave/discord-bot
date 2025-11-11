@@ -16,7 +16,7 @@ mod processes;
 async fn main() {
     let shards = 1;
 
-    let http = Http::new(env!("token"));
+    let http = Http::new(env!("TOKEN"));
     let event_handler = events::create_event_handler(shards);
     let command_manager = commands::create_command_handler();
 

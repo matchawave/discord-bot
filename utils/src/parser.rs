@@ -1,7 +1,12 @@
 use std::collections::HashMap;
 
 use dashmap::DashMap;
-use rayon::prelude::*;
+use rayon::{
+    iter::{
+        IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
+    },
+    slice::ParallelSliceMut,
+};
 use regex::{Captures, Regex};
 use serenity::all::{
     AfkTimeout, ChannelId, ChannelType, FormattedTimestamp, FormattedTimestampStyle, GuildChannel,
@@ -76,10 +81,9 @@ impl Parser {
         let roles = if key.contains("role") || key.contains("color") {
             let mut roles = (&member.roles)
                 .into_par_iter()
-                .filter_map(|r| guild.roles.get(r))
-                .cloned()
+                .filter_map(|r| guild.roles.get(r).cloned())
                 .collect::<Vec<_>>();
-            roles.sort_by(|a, b| b.position.cmp(&a.position));
+            roles.par_sort_by(|a, b| b.position.cmp(&a.position));
             Some(roles)
         } else {
             None
@@ -88,10 +92,13 @@ impl Parser {
         let position = if key.contains("join")
             && let Some(members) = &self.members
         {
-            let mut mems = members.par_iter().map(|m| (m.0, m.1)).collect::<Vec<_>>();
-            mems.sort_by_key(|m| m.1.join_date);
+            let mut mems = members
+                .into_par_iter()
+                .map(|m| (*m.0, *m.1))
+                .collect::<Vec<_>>();
+            mems.par_sort_by(|a, b| a.1.join_date.cmp(&b.1.join_date));
             mems.par_iter()
-                .position_first(|m| *m.0 == member.user.id)
+                .position_first(|m| m.0 == member.user.id)
                 .map(|i| i + 1)
         } else {
             None

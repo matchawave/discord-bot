@@ -7,9 +7,12 @@ use framework::{
     extractors::InteractionOptions,
 };
 use serenity::all::{
-    Colour, CommandOptionType, CreateCommandOption, CreateEmbed, GuildId, Member, UserId,
+    Colour, CommandOptionType, CreateCommandOption, CreateEmbed, CreateEmbedAuthor, GuildId,
+    Member, UserId,
 };
 use utils::{BotPermission, Http, MemberOption, command_error};
+
+use crate::commands::get_author_embed;
 
 const NAME: &str = "banner";
 const DESCRIPTION: &str = "Get the banner of a user";
@@ -35,13 +38,26 @@ async fn interaction(
     user_id: UserId,
     guild_id: GuildId,
 ) -> CommandResult<CreateEmbed> {
-    let Some(target) = (match options.get("user").and_then(|v| v.as_user_id()) {
+    let Some(mut target) = (match options.get("user").and_then(|v| v.as_user_id()) {
         Some(id) => members.fetch(&http, (guild_id, id)).await,
         None => members.fetch(&http, (guild_id, user_id)).await,
     }) else {
         return command_error!("No member found for the given ID");
     };
-    Ok(Some(create_embed(target)))
+
+    if target.user.accent_colour.is_none()
+        && let Some(member) = members.get((guild_id, target.user.id)).await
+        && let Ok(fetched) = http.get_user(target.user.id).await
+    {
+        member.write().await.user = fetched;
+        target = member.make_clone().await;
+    }
+
+    let Some(author) = get_author_embed(http, members, &target, user_id).await else {
+        return command_error!("Author member not found");
+    };
+
+    Ok(Some(create_embed(target, author)))
 }
 
 async fn legacy(
@@ -51,7 +67,7 @@ async fn legacy(
     user_id: UserId,
     guild_id: GuildId,
 ) -> CommandResult<CreateEmbed> {
-    let Some(target) = (match options.first().map(|id| id.parse::<MemberOption>()) {
+    let Some(mut target) = (match options.first().map(|id| id.parse::<MemberOption>()) {
         Some(Ok(id)) => members.fetch(&http, (guild_id, id.into())).await,
         Some(Err(e)) => return Err(e),
         None => members.fetch(&http, (guild_id, user_id)).await,
@@ -59,10 +75,22 @@ async fn legacy(
         return command_error!("No member found for the given ID");
     };
 
-    Ok(Some(create_embed(target)))
+    if target.user.accent_colour.is_none()
+        && let Some(member) = members.get((guild_id, target.user.id)).await
+        && let Ok(fetched) = http.get_user(target.user.id).await
+    {
+        member.write().await.user = fetched;
+        target = member.make_clone().await;
+    }
+
+    let Some(author) = get_author_embed(http, members, &target, user_id).await else {
+        return command_error!("Author member not found");
+    };
+
+    Ok(Some(create_embed(target, author)))
 }
 
-fn create_embed(target: Member) -> CreateEmbed {
+fn create_embed(target: Member, author: CreateEmbedAuthor) -> CreateEmbed {
     let color = target.user.accent_colour.unwrap_or(Colour::BLITZ_BLUE);
     let banner = target.user.banner_url().unwrap_or(format!(
         "https://singlecolorimage.com/get/{}/{}x{}",
@@ -74,4 +102,5 @@ fn create_embed(target: Member) -> CreateEmbed {
         .title(format!("Avatar of {}", target.user.tag()))
         .image(banner)
         .color(color)
+        .author(author)
 }

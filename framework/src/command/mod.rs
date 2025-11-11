@@ -14,7 +14,7 @@ use serenity::{
     Client,
     all::{
         CommandInteraction, Context, CreateCommand, CreateInteractionResponse, CreateMessage,
-        GuildId, Message,
+        GuildId, Member, Message,
     },
     async_trait,
     prelude::TypeMap,
@@ -23,12 +23,13 @@ use tokio::sync::RwLock;
 use utils::{ElapsedTime, Parser, Pointer, ResponseError, debug, error, info};
 
 use crate::{
+    cache::Members,
     command::response::CommandResponse,
     data::{
         Data,
         ephemeral::{Ephemeral, Ephemerals},
     },
-    extractors::Prefix,
+    extractors::{Extractor, Prefix},
     global::Commands,
 };
 
@@ -147,7 +148,19 @@ impl CommandExecution<Message> for CommandManager {
         new_msg.content = content.to_string();
 
         let action = CommandAction::from(&new_msg);
+
+        if let Some(part_member) = &msg.member {
+            let members = Members::extract(ctx, &action, parser).await?;
+            let key = (guild_id, msg.author.id);
+            if !members.contains(key).await {
+                let mut member: Member = (*part_member.clone()).into();
+                member.user = msg.author.clone();
+                members.insert(key, member).await;
+            }
+        }
+
         let callbacks = &command.callbacks;
+        if let Some(cooldown) = command.cooldown {}
         for callback in callbacks.iter() {
             let CommandCallbackType::Legacy(func) = callback else {
                 continue;
@@ -218,6 +231,15 @@ impl CommandExecution<CommandInteraction> for CommandManager {
 
         let command = self.0.read().await;
         let command = command.get(&c_name)?;
+
+        if let Some(member) = &interaction.member {
+            let members = Members::extract(ctx, &action, parser).await?;
+            let key = (member.guild_id, member.user.id);
+            if !members.contains(key).await {
+                let member = *member.clone();
+                members.insert(key, member).await;
+            }
+        }
 
         let callbacks = &command.callbacks;
         for callback in callbacks.iter() {

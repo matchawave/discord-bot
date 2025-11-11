@@ -19,7 +19,7 @@ impl HTTPGetter<(ChannelId, MessageId), Message> for Messages {
     ) -> Option<Message> {
         let (channel_id, message_id) = key;
         match self.0.read().await.get(&key).await {
-            Some(message) => Some(message.clone()),
+            Some(message) => Some(message.make_clone().await),
             None => match channel_id.message(http, message_id).await {
                 Ok(message) => {
                     self.insert(key, message.clone()).await;
@@ -47,7 +47,7 @@ impl Extractor<Event> for Message {
                     return None;
                 }
                 if messages
-                    .get(&(event.message.channel_id, event.message.id))
+                    .get((event.message.channel_id, event.message.id))
                     .await
                     .is_some()
                 {

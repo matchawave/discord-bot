@@ -1,4 +1,4 @@
-use std::{collections::HashMap, f32::consts::E, hash::Hash, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 use serenity::{
     all::{ChannelId, Context, Event, GuildChannel, GuildId},

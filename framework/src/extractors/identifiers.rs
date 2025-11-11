@@ -1,5 +1,5 @@
 use serenity::{
-    all::{ChannelId, Context, Event, GuildId, MessageId, ShardId, UserId},
+    all::{ChannelId, Context, Event, GuildId, Interaction, MessageId, ShardId, UserId},
     async_trait,
 };
 use utils::{Parser, Pointer};
@@ -98,6 +98,13 @@ impl Extractor<Event> for ChannelId {
             Event::ThreadDelete(env) => Some(env.thread.id),
             Event::ThreadListSync(_env) => None, // * VEC<ChannelId>
             Event::ThreadMembersUpdate(env) => Some(env.id),
+            Event::InteractionCreate(env) => match &env.interaction {
+                Interaction::Command(cmd) => Some(cmd.channel_id),
+                Interaction::Component(comp) => Some(comp.channel_id),
+                Interaction::Autocomplete(auto) => Some(auto.channel_id),
+                Interaction::Modal(modal) => Some(modal.channel_id),
+                _ => None,
+            },
             _ => None,
         }
     }
@@ -172,6 +179,13 @@ impl Extractor<Event> for UserId {
             Event::MessageUpdate(env) => env.author.as_ref().map(|u| u.id),
             // Event::MessageDelete(env) => None,
             // Event::MessageDeleteBulk(env) => None,
+            Event::InteractionCreate(env) => match &env.interaction {
+                Interaction::Command(cmd) => Some(cmd.user.id),
+                Interaction::Component(comp) => Some(comp.user.id),
+                Interaction::Autocomplete(auto) => Some(auto.user.id),
+                Interaction::Modal(modal) => Some(modal.user.id),
+                _ => None,
+            },
             Event::IntegrationCreate(env) => env.integration.user.as_ref().map(|u| u.id),
             Event::IntegrationUpdate(env) => env.integration.user.as_ref().map(|u| u.id),
             Event::ReactionAdd(env) => env.reaction.user_id,

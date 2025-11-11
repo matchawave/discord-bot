@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
 use framework::data::guild::Guilds;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serenity::all::{
     AfkMetadata, ChannelId, Guild, ImageHash, NsfwLevel, PartialGuild, PremiumTier,
     UnavailableGuild, UserId, VerificationLevel,
@@ -18,7 +19,7 @@ pub async fn update(guild: PartialGuild, guilds: Guilds) {
     if let Some(old_guild) = guilds.get(&guild.id).await {
         let old_guild = old_guild.read().await.clone();
         let changes = find_differences(&old_guild, &guild);
-        changes.iter().for_each(|c| {
+        changes.par_iter().for_each(|c| {
             info!("Guild Update for {} ({}): {}", guild.name, guild.id, c);
         });
     }

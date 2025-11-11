@@ -40,7 +40,7 @@ macro_rules! remove_cached_items {
             $guild_id
         );
         for key in keys {
-            cache_instance.remove(&key).await;
+            cache_instance.remove(key).await;
         }
     };
 }
@@ -89,7 +89,7 @@ pub async fn delete(ctx: &Context, guild: &UnavailableGuild) {
         guilds.remove(&guild.id).await;
     };
     let channels_cache = Channels::retrieve(&cache).await;
-    channels_cache.remove(&guild.id).await;
+    channels_cache.remove(guild.id).await;
 
     remove_cached_items!(cache, guild.id, VoiceStates);
     remove_cached_items!(cache, guild.id, Members);

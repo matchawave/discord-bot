@@ -25,10 +25,13 @@ impl TypeMapKey for Caches {
 #[macro_export]
 macro_rules! cached {
     ($struct_name: ident, $cache_type:ty, $key_type:ty) => {
-        pub struct $struct_name(utils::Pointer<moka::future::Cache<$key_type, $cache_type>>);
+        pub struct $struct_name(
+            utils::Pointer<moka::future::Cache<$key_type, utils::Pointer<$cache_type>>>,
+        );
 
         impl serenity::prelude::TypeMapKey for $struct_name {
-            type Value = utils::Pointer<moka::future::Cache<$key_type, $cache_type>>;
+            type Value =
+                utils::Pointer<moka::future::Cache<$key_type, utils::Pointer<$cache_type>>>;
         }
 
         impl $struct_name {
@@ -50,19 +53,34 @@ macro_rules! cached {
             }
 
             pub async fn insert(&self, key: $key_type, value: $cache_type) {
-                self.0.write().await.insert(key, value).await;
+                self.0
+                    .write()
+                    .await
+                    .insert(key, utils::Pointer::new(value))
+                    .await;
             }
 
-            pub async fn remove(&self, key: &$key_type) {
-                self.0.write().await.invalidate(key).await;
+            pub async fn remove(&self, key: $key_type) {
+                self.0.write().await.invalidate(&key).await;
             }
 
-            pub async fn get(&self, key: &$key_type) -> Option<$cache_type> {
-                self.0.read().await.get(key).await.map(|v| v.clone())
+            pub async fn get(&self, key: $key_type) -> Option<utils::Pointer<$cache_type>> {
+                self.0.read().await.get(&key).await.map(|v| v.clone())
             }
 
-            pub async fn vec(&self) -> Vec<(std::sync::Arc<$key_type>, $cache_type)> {
-                self.0.read().await.iter().collect()
+            pub async fn contains(&self, key: $key_type) -> bool {
+                self.0.read().await.contains_key(&key)
+            }
+
+            pub async fn vec(
+                &self,
+            ) -> Vec<(std::sync::Arc<$key_type>, utils::Pointer<$cache_type>)> {
+                self.0
+                    .read()
+                    .await
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect()
             }
         }
 

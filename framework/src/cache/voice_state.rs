@@ -37,9 +37,13 @@ where
 }
 
 async fn fetch_cached(
-    messages: &VoiceStates,
+    state: &VoiceStates,
     guild_id: GuildId,
     user_id: UserId,
 ) -> Option<VoiceState> {
-    messages.get(&(guild_id, user_id)).await.clone()
+    if let Some(state) = state.get((guild_id, user_id)).await {
+        Some(state.make_clone().await)
+    } else {
+        None
+    }
 }

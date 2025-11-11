@@ -23,7 +23,6 @@ pub async fn get_members(guild_id: GuildId, members_list: MembersInfo, http: Htt
             }
         }
         info!("Fetched {} members for guild {}", total, guild_id);
-        println!("{}", members_list.debug_print().await);
     });
 }
 

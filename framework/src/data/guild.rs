@@ -92,7 +92,7 @@ impl Extractor<CommandAction> for PartialGuild {
         let guild_id = GuildId::extract(ctx, action, p).await?;
         let Guilds(guilds) = Guilds::extract(ctx, action, p).await?;
         match guilds.read().await.get(&guild_id) {
-            Some(guild) => Some(guild.read().await.clone()),
+            Some(guild) => Some(guild.make_clone().await),
             None => None,
         }
     }

@@ -12,7 +12,7 @@ use serenity::{
     async_trait,
 };
 use tokio::sync::mpsc::{self, Receiver, Sender};
-use utils::{DiscordEvent, ElapsedTime, Parser, Pointer, info};
+use utils::{DiscordEvent, ElapsedTime, Parser, Pointer, debug, info};
 
 use crate::{
     HandlerFn,
@@ -69,7 +69,7 @@ impl RawEventHandler for EventManager {
 async fn worker(mut receiver: Receiver<(Context, Event)>, callbacks: Arc<CallbackMap>) {
     while let Some((ctx, event)) = receiver.recv().await {
         if let Some(name) = event.name() {
-            info!("Received event {} for shard {}", name, ctx.shard_id.get());
+            debug!("Received event {} for shard {}", name, ctx.shard_id.get());
         }
         let parser = Pointer::new(Parser::new(ctx.shard_id));
         update_bot(&ctx, &event).await;

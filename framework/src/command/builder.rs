@@ -66,6 +66,7 @@ impl ICommand {
     }
 }
 
+#[allow(clippy::from_over_into)]
 impl Into<Vec<CreateCommand>> for &ICommand {
     fn into(self) -> Vec<CreateCommand> {
         if self.callbacks.is_empty() {

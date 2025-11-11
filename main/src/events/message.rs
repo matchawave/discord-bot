@@ -18,8 +18,8 @@ pub async fn update(update_msg: Message, messages: Messages, snipes: EditSnipes,
         return;
     }
     let (channel_id, message_id) = (update_msg.channel_id, update_msg.id);
-    if let Some(old_msg) = messages.get(&(channel_id, message_id)).await {
-        snipes.insert(old_msg).await;
+    if let Some(old_msg) = messages.get((channel_id, message_id)).await {
+        snipes.insert(old_msg.make_clone().await).await;
         debug!("Stored old message id {} in edit snipes", message_id);
     }
     messages.insert((channel_id, message_id), update_msg).await;
@@ -31,7 +31,7 @@ pub async fn delete(msg: Option<Message>, snipes: Snipes, messages: Messages) {
         if msg.author.bot {
             return;
         }
-        messages.remove(&(msg.channel_id, msg.id)).await;
+        messages.remove((msg.channel_id, msg.id)).await;
         debug!("Deleted message: {}", msg.content);
         snipes.insert(msg).await;
     }

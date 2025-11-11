@@ -7,5 +7,5 @@ pub async fn update(
     new_state: VoiceState,
     voice_states: VoiceStates,
 ) {
-    let old_state = voice_states.get(&(guild_id, member.user.id)).await;
+    let old_state = voice_states.get((guild_id, member.user.id)).await;
 }
