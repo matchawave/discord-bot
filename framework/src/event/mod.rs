@@ -1,8 +1,8 @@
 mod guild;
 mod interactions;
 mod message;
-mod ready;
 mod user;
+mod voice_states;
 
 use std::sync::Arc;
 
@@ -12,7 +12,7 @@ use serenity::{
     async_trait,
 };
 use tokio::sync::mpsc::{self, Receiver, Sender};
-use utils::{DiscordEvent, ElapsedTime, Parser, Pointer, debug, info};
+use utils::{DiscordEvent, ElapsedTime, Parser, Pointer, error, info};
 
 use crate::{
     HandlerFn,
@@ -61,16 +61,13 @@ impl RawEventHandler for EventManager {
         if let Some(sender) = self.senders.get(shard_id)
             && let Err(e) = sender.send((ctx, event)).await
         {
-            eprintln!("Error sending event to shard {}: {}", shard_id, e);
+            error!("Error sending event to shard {}: {}", shard_id, e);
         }
     }
 }
 
 async fn worker(mut receiver: Receiver<(Context, Event)>, callbacks: Arc<CallbackMap>) {
     while let Some((ctx, event)) = receiver.recv().await {
-        if let Some(name) = event.name() {
-            debug!("Received event {} for shard {}", name, ctx.shard_id.get());
-        }
         let parser = Pointer::new(Parser::new(ctx.shard_id));
         update_bot(&ctx, &event).await;
         cache_guild(&ctx, &event).await;
@@ -87,12 +84,24 @@ async fn worker(mut receiver: Receiver<(Context, Event)>, callbacks: Arc<Callbac
             for func in funcs.iter() {
                 func.call(&ctx, &event, &parser).await;
             }
+            let shard_text = format!("Shard {}", ctx.shard_id.get());
             match event.name() {
-                Some(n) => info!("event {} handled in {:?}ms", n, elapsed.elapsed_ms()),
-                None => info!("event handled in {:?}ms", elapsed.elapsed_ms()),
+                Some(n) => info!(
+                    "({}) {} {} event handled in {:?}ms",
+                    shard_text.bold().purple(),
+                    "|".bold().white(),
+                    n,
+                    elapsed.elapsed_ms()
+                ),
+                None => info!(
+                    "({}) {} event handled in {:?}ms",
+                    "|".bold().white(),
+                    shard_text.bold().purple(),
+                    elapsed.elapsed_ms()
+                ),
             }
         }
-
+        handle_voice_state_update(&ctx, &event).await;
         delete_guilds(&ctx, &event).await;
     }
 }
@@ -118,7 +127,6 @@ async fn command_event(ctx: &Context, event: &Event, parser: &Pointer<Parser>) -
 async fn notify_startup(ctx: &Context, event: &Event) {
     if let Event::Ready(ready) = event {
         user::update_bot(ctx, &ready.ready.user).await;
-        ready::handle(ctx, &ready.ready).await;
     }
 }
 
@@ -137,5 +145,11 @@ async fn cache_guild(ctx: &Context, event: &Event) {
 async fn delete_guilds(ctx: &Context, event: &Event) {
     if let Event::GuildDelete(e) = event {
         guild::delete(ctx, &e.guild).await;
+    }
+}
+
+async fn handle_voice_state_update(ctx: &Context, event: &Event) {
+    if let Event::VoiceStateUpdate(e) = event {
+        voice_states::update(ctx, &e.voice_state).await;
     }
 }

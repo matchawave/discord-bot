@@ -1,20 +1,15 @@
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
-use framework::{
-    command::CommandAction,
-    data::{Data, DataExt},
-    extractors::Extractor,
-};
+use framework::{DataExtractable, DefaultExtract, extractors::Extractor};
 use serenity::{
-    all::{Event, GuildId, Member, Timestamp, UserId},
-    async_trait,
-    prelude::{TypeMap, TypeMapKey},
+    all::{GuildId, Member, UserId},
+    prelude::TypeMapKey,
 };
 use utils::{MemberData, Pointer};
 
 type MemberDataMap = HashMap<UserId, MemberData>;
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, DataExtractable, DefaultExtract)]
 pub struct MembersInfo(Pointer<HashMap<GuildId, Pointer<MemberDataMap>>>);
 
 impl MembersInfo {
@@ -76,47 +71,5 @@ impl MembersInfo {
 }
 
 impl TypeMapKey for MembersInfo {
-    type Value = MembersInfo;
-}
-
-impl DataExt for MembersInfo {
-    fn init(map: &mut TypeMap) {
-        map.insert::<MembersInfo>(MembersInfo::default());
-    }
-
-    fn retrieve(map: &Arc<TypeMap>) -> Self {
-        map.get::<MembersInfo>()
-            .expect("MembersInfo not found in TypeMap")
-            .clone()
-    }
-}
-
-#[async_trait]
-impl Extractor<Event> for MembersInfo {
-    async fn extract(
-        ctx: &serenity::all::Context,
-        _ev: &Event,
-        _p: &Pointer<utils::Parser>,
-    ) -> Option<Self> {
-        let shard_id = ctx.shard_id;
-        Data::get(&ctx.data, shard_id)
-            .await
-            .as_ref()
-            .map(MembersInfo::retrieve)
-    }
-}
-
-#[async_trait]
-impl Extractor<CommandAction> for MembersInfo {
-    async fn extract(
-        ctx: &serenity::all::Context,
-        _action: &CommandAction,
-        _p: &Pointer<utils::Parser>,
-    ) -> Option<Self> {
-        let shard_id = ctx.shard_id;
-        Data::get(&ctx.data, shard_id)
-            .await
-            .as_ref()
-            .map(MembersInfo::retrieve)
-    }
+    type Value = Pointer<HashMap<GuildId, Pointer<MemberDataMap>>>;
 }

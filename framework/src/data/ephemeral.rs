@@ -1,14 +1,14 @@
 use std::collections::HashMap;
 
 use serenity::{
-    all::{ChannelId, GuildId, Message, MessageId},
+    all::{ChannelId, Message, MessageId},
     async_trait,
 };
 use utils::{Pointer, error, info};
 
 use crate::{build_process, processes::ProcessLoop};
 
-build_process!(Ephemerals, Pointer<HashMap<Ephemeral, std::time::Instant>>);
+build_process!(Ephemerals, HashMap<Ephemeral, std::time::Instant>);
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub struct Ephemeral {

@@ -5,11 +5,13 @@ use serenity::{
     prelude::TypeMap,
 };
 
-use crate::data::set_sharded_data;
+use crate::{cache::set_sharded_cache, data::set_sharded_data, global::set_global};
+mod cache;
 mod commands;
-pub mod data;
+mod data;
 mod events;
 mod extractors;
+mod global;
 mod processes;
 
 #[tokio::main]
@@ -21,7 +23,9 @@ async fn main() {
     let command_manager = commands::create_command_handler();
 
     let mut map = TypeMap::new();
+    set_global(&mut map);
     set_sharded_data(shards, &mut map);
+    set_sharded_cache(shards, &mut map);
     command_manager.set(&mut map);
 
     let client_builder = ClientBuilder::new_with_http(http, get_guild_intents())

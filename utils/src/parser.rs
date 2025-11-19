@@ -42,29 +42,24 @@ impl Parser {
         }
     }
 
-    pub fn with_channel(mut self, category: Option<GuildChannel>, channel: GuildChannel) -> Self {
+    pub fn with_channel(&mut self, category: Option<GuildChannel>, channel: GuildChannel) {
         self.channel = (category, Some(channel));
-        self
     }
 
-    pub fn with_member(mut self, member: Member) -> Self {
+    pub fn with_member(&mut self, member: Member) {
         self.member = Some(member);
-        self
     }
 
-    pub fn with_channels(mut self, channels: HashMap<ChannelId, GuildChannel>) -> Self {
+    pub fn with_channels(&mut self, channels: HashMap<ChannelId, GuildChannel>) {
         self.channels = Some(channels);
-        self
     }
 
-    pub fn with_members(mut self, members: HashMap<UserId, MemberData>) -> Self {
+    pub fn with_members(&mut self, members: HashMap<UserId, MemberData>) {
         self.members = Some(members);
-        self
     }
 
-    pub fn with_guild(mut self, guild: PartialGuild) -> Self {
+    pub fn with_guild(&mut self, guild: PartialGuild) {
         self.guild = Some(guild);
-        self
     }
 
     fn get(&self, path: &str) -> Option<String> {

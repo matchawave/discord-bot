@@ -4,11 +4,11 @@ use serenity::{
     all::{GuildId, UserId},
     async_trait,
 };
-use utils::{Pointer, info};
+use utils::{Http, Pointer, info};
 
 use crate::{build_process, processes::ProcessLoop};
 
-build_process!(Cooldowns, Pointer<HashMap<Cooldown, std::time::Instant>>);
+build_process!(Cooldowns, HashMap<Cooldown, std::time::Instant>);
 
 #[derive(Hash, Eq, PartialEq, Clone)]
 pub struct Cooldown {
@@ -29,7 +29,7 @@ impl Cooldown {
 
 #[async_trait]
 impl ProcessLoop for Cooldowns {
-    async fn process(&self, http: std::sync::Arc<serenity::http::Http>) {
+    async fn process(&self, _http: Http) {
         let map = self.0.make_clone().await;
         let now = std::time::Instant::now();
         for (key, &time) in map.iter() {

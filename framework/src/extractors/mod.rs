@@ -1,27 +1,20 @@
 mod aliases;
 mod bot;
-mod channel;
 mod command_options;
 mod event;
 mod http;
 mod identifiers;
 mod interaction;
 mod parser;
-mod prefix;
 mod shard_manager;
 
 pub use aliases::*;
 pub use bot::*;
-pub use channel::*;
 pub use command_options::*;
-pub use http::*;
-pub use interaction::*;
-pub use parser::*;
-pub use prefix::*;
 pub use shard_manager::*;
 
 use serenity::{all::Context, async_trait};
-use utils::{Parser, Pointer, debug};
+use utils::{Parser, Pointer};
 
 use crate::HandlerFn;
 
@@ -37,10 +30,7 @@ where
     U: Extractor<T> + Send + Sync + 'static,
 {
     async fn extract(ctx: &Context, ev: &T, p: &Pointer<Parser>) -> Option<Self> {
-        match U::extract(ctx, ev, p).await {
-            Some(value) => Some(Some(value)),
-            None => Some(None),
-        }
+        Some(U::extract(ctx, ev, p).await)
     }
 }
 
@@ -124,7 +114,18 @@ macro_rules! impl_from_request_tuple {
         #[serenity::async_trait]
         impl<T, $($ty,)*> ExtractorTuple<T> for ($($ty,)*)
         where T: Send + Sync + 'static, $($ty: Extractor<T> + Send + Sync + 'static,)*
-        { async fn extract_tuple(ctx: &Context, action: &T, p: &Pointer<Parser>) -> Option<Self> { Some(($($ty::extract(ctx, action, p).await?,)*)) } }
+        { async fn extract_tuple(ctx: &Context, action: &T, p: &Pointer<Parser>) -> Option<Self> {
+            let result = (
+                $(match $ty::extract(ctx, action, p).await {
+                    Some(value) => value,
+                    None => {
+                        utils::debug!("[Extractor] : Failed to extract {}", std::any::type_name::<$ty>());
+                        return None;
+                    },
+                },)*
+            );
+            Some(result)
+        } }
     };
 }
 impl_from_request_tuple!();

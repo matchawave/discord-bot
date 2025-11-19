@@ -1,16 +1,13 @@
-use std::option;
-
 use framework::{
     cache::{HTTPGetter, Members},
     command::{CommandCallbackType, CommandResult, ICommand},
-    data::guild,
     extractors::InteractionOptions,
 };
 use serenity::all::{
     Colour, CommandOptionType, CreateCommandOption, CreateEmbed, CreateEmbedAuthor, GuildId,
     Member, UserId,
 };
-use utils::{BotPermission, Http, MemberOption, command_error};
+use utils::{Http, MemberOption, command_error};
 
 use crate::commands::get_author_embed;
 

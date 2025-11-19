@@ -10,10 +10,13 @@ cached!(VoiceStates, VoiceState, (GuildId, UserId));
 
 #[async_trait]
 impl Extractor<Event> for VoiceState {
-    async fn extract(ctx: &Context, ev: &Event, p: &Pointer<Parser>) -> Option<Self> {
-        let (guild_id, user_id) = get_ids(ctx, ev, p).await?;
-        let voice_states = VoiceStates::extract(ctx, ev, p).await?;
-        fetch_cached(&voice_states, guild_id, user_id).await
+    async fn extract(_ctx: &Context, ev: &Event, _p: &Pointer<Parser>) -> Option<Self> {
+        match ev {
+            Event::VoiceStateUpdate(voice_state_update) => {
+                Some(voice_state_update.voice_state.clone())
+            }
+            _ => None,
+        }
     }
 }
 

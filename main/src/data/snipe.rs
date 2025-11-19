@@ -1,37 +1,19 @@
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
-use framework::{
-    command::CommandAction,
-    data::{Data, DataExt},
-    extractors::Extractor,
-};
+use framework::{DataExtractable, DefaultExtract, extractors::Extractor};
 use serenity::{
-    all::{ChannelId, Event, Message},
-    async_trait,
-    prelude::{TypeMap, TypeMapKey},
+    all::{ChannelId, Message},
+    prelude::TypeMapKey,
 };
 use utils::Pointer;
 
 macro_rules! snipe_builder {
     ($name:ident, $base:ty) => {
-        #[derive(Clone, Default)]
+        #[derive(Clone, Default, DataExtractable, DefaultExtract)]
         pub struct $name(Pointer<HashMap<ChannelId, Vec<$base>>>);
 
         impl TypeMapKey for $name {
             type Value = Pointer<HashMap<ChannelId, Vec<$base>>>;
-        }
-
-        impl DataExt for $name {
-            fn init(map: &mut TypeMap) {
-                map.insert::<$name>(Pointer::new(HashMap::new()));
-            }
-
-            fn retrieve(map: &Arc<TypeMap>) -> Self {
-                map.get::<$name>()
-                    .cloned()
-                    .map($name)
-                    .expect(concat!(stringify!($name), " data not initialized"))
-            }
         }
 
         impl $name {
@@ -47,36 +29,6 @@ macro_rules! snipe_builder {
                 if entry.len() > 10 {
                     entry.remove(0);
                 }
-            }
-        }
-
-        #[async_trait]
-        impl Extractor<CommandAction> for $name {
-            async fn extract(
-                ctx: &serenity::prelude::Context,
-                _ev: &CommandAction,
-                _p: &Pointer<utils::Parser>,
-            ) -> Option<Self> {
-                let shard_id = ctx.shard_id;
-                Data::get(&ctx.data, shard_id)
-                    .await
-                    .and_then(|d| d.get::<Self>().cloned())
-                    .map(Self)
-            }
-        }
-
-        #[async_trait]
-        impl Extractor<Event> for $name {
-            async fn extract(
-                ctx: &serenity::prelude::Context,
-                _ev: &Event,
-                _p: &Pointer<utils::Parser>,
-            ) -> Option<Self> {
-                let shard_id = ctx.shard_id;
-                Data::get(&ctx.data, shard_id)
-                    .await
-                    .and_then(|d| d.get::<Self>().cloned())
-                    .map(Self)
             }
         }
     };

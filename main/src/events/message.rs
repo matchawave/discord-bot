@@ -4,7 +4,7 @@ use utils::debug;
 
 use crate::data::snipe::{EditSnipes, Snipes};
 
-pub async fn create(msg: Message, messages: Messages, member: Member) {
+pub async fn create(msg: Message, _messages: Messages, member: Member) {
     if member.user.bot {
         return;
     }

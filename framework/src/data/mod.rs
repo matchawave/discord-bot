@@ -1,12 +1,18 @@
-pub mod cooldown;
-pub mod ephemeral;
-pub mod guild;
+mod cooldown;
+mod ephemeral;
+mod guild;
+mod prefix;
+
+pub use cooldown::*;
+pub use ephemeral::*;
+pub use guild::*;
+pub use prefix::*;
 
 use std::sync::Arc;
 
 use serenity::prelude::{TypeMap, TypeMapKey};
 
-use crate::{data::guild::Guilds, sharded_data};
+use crate::{DataExtractable, sharded_data};
 
 struct Datas;
 impl TypeMapKey for Datas {
@@ -15,12 +21,8 @@ impl TypeMapKey for Datas {
 
 sharded_data!(Data, Datas, { set_sharded_data });
 pub fn set_sharded_data(data: &mut serenity::prelude::TypeMap) {
+    Prefixes::init(data);
     Guilds::init(data);
-}
-
-pub trait DataExt {
-    fn init(map: &mut TypeMap);
-    fn retrieve(map: &Arc<TypeMap>) -> Self
-    where
-        Self: Sized;
+    Cooldowns::init(data);
+    Ephemerals::init(data);
 }

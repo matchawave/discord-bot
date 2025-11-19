@@ -3,15 +3,13 @@ use std::{collections::HashMap, sync::Arc};
 use framework::{
     cache::{Channels, HTTPGetter},
     command::{CommandCallbackType, CommandResult, ICommand},
-    data::guild,
 };
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serenity::all::{
-    ChannelId, Colour, CommandOptionType, CreateCommandOption, CreateEmbed, FormattedTimestamp,
-    FormattedTimestampStyle, GuildChannel, Mentionable, PartialGuild, PremiumTier, ShardId,
-    ShardManager, UserId, VerificationLevel,
+    ChannelId, Colour, CreateEmbed, FormattedTimestamp, FormattedTimestampStyle, GuildChannel,
+    Mentionable, PartialGuild, PremiumTier, ShardId, ShardManager, UserId, VerificationLevel,
 };
-use utils::{BotPermission, Http, MemberData, Pointer};
+use utils::{Http, MemberData, Pointer};
 
 use crate::data::member::MembersInfo;
 
@@ -75,7 +73,7 @@ async fn execute(
         fields.push(("Designs".to_string(), designs, true));
     }
     if let Some(channels) = channels.fetch(&http, guild.id).await {
-        let channels = get_channels(channels);
+        let channels = get_channels(channels.make_clone().await);
         let title = format!("Channels ({})", channels.0);
         fields.push((title, channels.1, true));
     }

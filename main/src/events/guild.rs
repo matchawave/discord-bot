@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use framework::data::guild::Guilds;
+use framework::data::Guilds;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serenity::all::{
     AfkMetadata, ChannelId, Guild, ImageHash, NsfwLevel, PartialGuild, PremiumTier,
@@ -8,11 +8,19 @@ use serenity::all::{
 };
 use utils::info;
 
-use crate::data::member::MembersInfo;
+use crate::data::{member::MembersInfo, voice_channels::ChannelMembers};
 
 pub async fn create(guild: Guild, guild_members: MembersInfo) {
     info!("Joined guild {} ({})", guild.name, guild.id);
     guild_members.insert(guild.id, Default::default()).await;
+}
+
+pub async fn get_voices(guild: Guild, channel_members: ChannelMembers) {
+    for (user_id, state) in guild.voice_states.iter() {
+        if let Some(channel_id) = state.channel_id {
+            channel_members.insert(guild.id, channel_id, *user_id).await;
+        }
+    }
 }
 
 pub async fn update(guild: PartialGuild, guilds: Guilds) {

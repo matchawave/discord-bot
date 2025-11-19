@@ -1,16 +1,11 @@
 use std::{sync::Arc, time::Duration};
 
-use chrono::Utc;
-use framework::{
-    command::{CommandCallbackType, CommandResult, ICommand, response::CommandResponse},
-    extractors::CurrentBot,
-};
+use framework::command::{CommandCallbackType, CommandResult, ICommand};
 use serenity::all::{
-    CommandInteraction, CommandOptionType, CommandType, CreateCommandOption,
-    CreateInteractionResponse, CreateInteractionResponseMessage, EditInteractionResponse,
-    EditMessage, Message, ShardId, ShardManager,
+    CommandInteraction, CreateInteractionResponse, CreateInteractionResponseMessage,
+    EditInteractionResponse, EditMessage, Message, ShardId, ShardManager,
 };
-use utils::{BotPermission, ElapsedTime, Http, command_error, command_warn, error};
+use utils::{ElapsedTime, Http, command_warn, error};
 
 const NAME: &str = "ping";
 const DESCRIPTION: &str = "Check the bot's latency";

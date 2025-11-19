@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 use serenity::{
-    all::{Colour, CommandInteraction, Context, CreateEmbed, Message},
+    all::{CommandInteraction, Context, Message},
     async_trait,
 };
-use utils::{Parser, Pointer, ResponseError};
+use utils::{Parser, Pointer};
 
 use crate::{
     HandlerFn,
@@ -14,65 +14,6 @@ use crate::{
 
 pub trait CallbackReturn: Send + Sync {
     fn into_response(self: Box<Self>) -> Option<CommandResponse>;
-}
-
-impl CallbackReturn for () {
-    fn into_response(self: Box<Self>) -> Option<CommandResponse> {
-        None
-    }
-}
-
-impl CallbackReturn for CommandResponse {
-    fn into_response(self: Box<Self>) -> Option<CommandResponse> {
-        Some(*self)
-    }
-}
-
-impl CallbackReturn for Option<CommandResponse> {
-    fn into_response(self: Box<Self>) -> Option<CommandResponse> {
-        *self
-    }
-}
-
-impl CallbackReturn for super::CommandResult<CommandResponse> {
-    fn into_response(self: Box<Self>) -> Option<CommandResponse> {
-        match *self {
-            Ok(response) => response,
-            Err(e) => Some(create_error_embed(e)),
-        }
-    }
-}
-
-impl CallbackReturn for super::CommandResult<CreateEmbed> {
-    fn into_response(self: Box<Self>) -> Option<CommandResponse> {
-        match *self {
-            Ok(Some(embed)) => Some(CommandResponse::new_embeds(vec![embed]).reply()),
-            Ok(None) => None,
-            Err(e) => Some(create_error_embed(e)),
-        }
-    }
-}
-
-impl CallbackReturn for super::CommandResult<Vec<CreateEmbed>> {
-    fn into_response(self: Box<Self>) -> Option<CommandResponse> {
-        match *self {
-            Ok(Some(embeds)) => Some(CommandResponse::new_embeds(embeds).reply()),
-            Ok(None) => None,
-            Err(e) => Some(create_error_embed(e)),
-        }
-    }
-}
-
-fn create_error_embed(error: ResponseError) -> CommandResponse {
-    let mut embed = CreateEmbed::default();
-    embed = embed.description(error.to_string());
-    match error {
-        ResponseError::Err(_) => embed = embed.color(Colour::RED),
-        ResponseError::Warn(_) => embed = embed.color(Colour::GOLD),
-        ResponseError::Info(_) => embed = embed.color(Colour::BLITZ_BLUE),
-    };
-
-    CommandResponse::new_embeds(vec![embed]).ephemeral()
 }
 
 pub enum CommandAction {

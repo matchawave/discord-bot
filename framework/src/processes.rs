@@ -2,35 +2,27 @@ use std::sync::Arc;
 
 use serenity::{
     all::{Http, ShardId},
-    async_trait, http,
+    async_trait,
     prelude::TypeMap,
 };
 use tokio::sync::RwLock;
 use utils::{error, info};
 
-use crate::data::{cooldown::Cooldowns, ephemeral::Ephemerals};
+use crate::{
+    DataExtractable,
+    data::{Cooldowns, Ephemerals},
+};
 
 #[macro_export]
 macro_rules! build_process {
     ($name:ident, $ty:ty) => {
-        #[derive(Clone, Default)]
-        pub struct $name(pub $ty);
+        use $crate::DataExtractable;
 
-        impl $crate::data::DataExt for $name {
-            fn init(map: &mut serenity::prelude::TypeMap) {
-                map.insert::<$name>(Self::default().into());
-            }
-
-            fn retrieve(map: &std::sync::Arc<serenity::prelude::TypeMap>) -> Self {
-                map.get::<$name>()
-                    .cloned()
-                    .map(|p| (*p).clone())
-                    .expect(concat!(stringify!($name), " data not initialized"))
-            }
-        }
+        #[derive(Clone, Default, DataExtractable)]
+        pub struct $name(pub utils::Pointer<$ty>);
 
         impl serenity::prelude::TypeMapKey for $name {
-            type Value = std::sync::Arc<$name>;
+            type Value = utils::Pointer<$ty>;
         }
     };
 }
@@ -47,7 +39,7 @@ impl ProcessManager {
             datas: data,
             http,
             shards,
-            processes: Vec::new().into(),
+            processes: Vec::new(),
         }
     }
     pub async fn init_loop(&self) {
@@ -81,10 +73,11 @@ impl ProcessManager {
     ) {
         info!("(processes) Starting process loop for shard {}", shard);
         loop {
-            if let Some(cooldowns) = data.get::<Cooldowns>() {
+            if let Some(cooldowns) = Cooldowns::retrieve(&data) {
                 cooldowns.process(http.clone()).await;
             }
-            if let Some(ephemerals) = data.get::<Ephemerals>() {
+
+            if let Some(ephemerals) = Ephemerals::retrieve(&data) {
                 ephemerals.process(http.clone()).await;
             }
 
@@ -97,5 +90,5 @@ impl ProcessManager {
 
 #[async_trait]
 pub trait ProcessLoop {
-    async fn process(&self, http: Arc<Http>);
+    async fn process(&self, http: utils::Http);
 }

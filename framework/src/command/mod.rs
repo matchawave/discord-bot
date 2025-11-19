@@ -1,4 +1,5 @@
 mod builder;
+mod callback_functions;
 mod functions;
 pub mod response;
 pub use builder::ICommand;
@@ -23,13 +24,11 @@ use tokio::sync::RwLock;
 use utils::{ElapsedTime, Parser, Pointer, ResponseError, debug, error, info};
 
 use crate::{
+    DataExtractable,
     cache::Members,
     command::response::CommandResponse,
-    data::{
-        Data,
-        ephemeral::{Ephemeral, Ephemerals},
-    },
-    extractors::{Extractor, Prefix},
+    data::{Data, Ephemeral, Ephemerals, Prefixes},
+    extractors::Extractor,
     global::Commands,
 };
 
@@ -122,10 +121,9 @@ impl CommandExecution<Message> for CommandManager {
     ) -> Option<String> {
         let guild_id = msg.guild_id?;
 
-        let Some(Prefix(prefix)) = Prefix::get(&ctx.data, guild_id).await else {
-            error!("Failed to get prefix for guild {}", guild_id);
-            return None;
-        };
+        let shard_data = Data::get(&ctx.data, ctx.shard_id).await?;
+        let prefixes = Prefixes::retrieve(&shard_data)?;
+        let prefix = prefixes.get(guild_id).await;
 
         let content = msg.content.clone();
 
@@ -185,11 +183,12 @@ impl CommandExecution<Message> for CommandManager {
                 response_msg = response_msg.allowed_mentions((&response).into()); // Set allowed mentions based on response
             }
 
+            let possible_channel_id = response.get_channel();
+
             tokio::spawn({
                 let http = ctx.http.clone();
-                let channel_id = msg.channel_id;
-                let shard_id = ctx.shard_id;
-                let data = ctx.data.clone();
+                let channel_id = possible_channel_id.unwrap_or(msg.channel_id);
+                let shard_data = shard_data.clone();
                 async move {
                     let m = match http
                         .send_message(channel_id, attachments.clone(), &response_msg)
@@ -203,10 +202,9 @@ impl CommandExecution<Message> for CommandManager {
                     };
 
                     if response.is_ephemeral()
-                        && let Some(shard_data) = Data::get(&data, shard_id).await
-                        && let Some(ephemerals) = shard_data.get::<Ephemerals>()
+                        && let Some(Ephemerals(ephemerals)) = Ephemerals::retrieve(&shard_data)
                     {
-                        let mut map = ephemerals.0.write().await;
+                        let mut map = ephemerals.write().await;
                         map.insert(Ephemeral::new(&m), Instant::now() + Duration::from_secs(3));
                     }
                 }

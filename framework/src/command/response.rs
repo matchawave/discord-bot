@@ -1,6 +1,6 @@
 use serenity::{
     all::{
-        CreateActionRow, CreateAllowedMentions, CreateAttachment, CreateEmbed,
+        ChannelId, CreateActionRow, CreateAllowedMentions, CreateAttachment, CreateEmbed,
         CreateInteractionResponse, CreateInteractionResponseMessage, CreateMessage, CreatePoll,
         create_poll::Ready,
     },
@@ -9,8 +9,8 @@ use serenity::{
 use utils::{ResponseError, command_error};
 
 const MAX_COMPONENTS: usize = 10;
-const MAX_EMBEDS: usize = 10;
-const MAX_ATTACHMENTS: usize = 10;
+// const MAX_EMBEDS: usize = 10;
+// const MAX_ATTACHMENTS: usize = 10;
 
 #[derive(Debug, Default)]
 pub struct CommandResponse {
@@ -22,6 +22,7 @@ pub struct CommandResponse {
     ephemeral: bool,
     reply: bool,
     mention: bool,
+    channel_id: Option<ChannelId>, // Optional channel ID for sending to a specific channel
 }
 
 impl CommandResponse {
@@ -107,6 +108,15 @@ impl CommandResponse {
     pub fn mention(mut self) -> Self {
         self.mention = true;
         self
+    }
+
+    pub fn channel_id(mut self, channel_id: ChannelId) -> Self {
+        self.channel_id = Some(channel_id);
+        self
+    }
+
+    pub fn get_channel(&self) -> Option<ChannelId> {
+        self.channel_id
     }
 
     pub fn should_reply(&self) -> bool {

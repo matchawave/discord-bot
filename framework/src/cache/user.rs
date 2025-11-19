@@ -18,8 +18,8 @@ impl HTTPGetter<(GuildId, UserId), Member> for Members {
         key: (GuildId, UserId),
     ) -> Option<Member> {
         let (guild_id, user_id) = key;
-        match self.0.read().await.get(&key).await {
-            Some(member) => return Some(member.make_clone().await),
+        match self.get_cloned(key).await {
+            Some(member) => return Some(member),
             None => match guild_id.member(http, user_id).await {
                 Ok(member) => Some(member),
                 Err(err) => {

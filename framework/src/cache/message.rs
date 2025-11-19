@@ -18,8 +18,8 @@ impl HTTPGetter<(ChannelId, MessageId), Message> for Messages {
         key: (ChannelId, MessageId),
     ) -> Option<Message> {
         let (channel_id, message_id) = key;
-        match self.0.read().await.get(&key).await {
-            Some(message) => Some(message.make_clone().await),
+        match self.get_cloned(key).await {
+            Some(message) => Some(message),
             None => match channel_id.message(http, message_id).await {
                 Ok(message) => {
                     self.insert(key, message.clone()).await;

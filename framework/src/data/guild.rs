@@ -8,11 +8,7 @@ use serenity::{
 };
 use utils::{Parser, Pointer};
 
-use crate::{
-    command::CommandAction,
-    data::{Data, DataExt},
-    extractors::Extractor,
-};
+use crate::{DataExtractable, command::CommandAction, data::Data, extractors::Extractor};
 
 type GuildMap = DashMap<GuildId, Pointer<PartialGuild>>;
 pub struct Guilds(Pointer<GuildMap>);
@@ -34,42 +30,26 @@ impl Guilds {
     }
 }
 
-impl DataExt for Guilds {
+impl DataExtractable for Guilds {
     fn init(map: &mut TypeMap) {
         map.insert::<Guilds>(Pointer::new(DashMap::new()));
     }
 
-    fn retrieve(map: &Arc<TypeMap>) -> Self {
-        map.get::<Guilds>()
-            .cloned()
-            .map(Guilds)
-            .expect("Guilds data not initialized")
+    fn retrieve(map: &Arc<TypeMap>) -> Option<Self> {
+        map.get::<Guilds>().cloned().map(Guilds)
     }
 }
 
 #[async_trait]
-impl Extractor<Event> for Guilds {
+impl<T> Extractor<T> for Guilds {
     async fn extract(
         ctx: &serenity::all::Context,
-        _ev: &Event,
+        _ev: &T,
         _p: &Pointer<utils::Parser>,
     ) -> Option<Self> {
         let shard_id = ctx.shard_id;
         let data = Data::get(&ctx.data, shard_id).await?;
-        Some(Guilds::retrieve(&data))
-    }
-}
-
-#[async_trait]
-impl Extractor<crate::command::CommandAction> for Guilds {
-    async fn extract(
-        ctx: &serenity::all::Context,
-        _action: &crate::command::CommandAction,
-        _p: &Pointer<utils::Parser>,
-    ) -> Option<Self> {
-        let shard_id = ctx.shard_id;
-        let data = Data::get(&ctx.data, shard_id).await?;
-        Some(Guilds::retrieve(&data))
+        Guilds::retrieve(&data)
     }
 }
 
@@ -77,12 +57,8 @@ impl Extractor<crate::command::CommandAction> for Guilds {
 impl Extractor<CommandAction> for Pointer<PartialGuild> {
     async fn extract(ctx: &Context, action: &CommandAction, p: &Pointer<Parser>) -> Option<Self> {
         let guild_id = GuildId::extract(ctx, action, p).await?;
-        let Guilds(guilds) = Guilds::extract(ctx, action, p).await?;
-        guilds
-            .read()
-            .await
-            .get(&guild_id)
-            .map(|pg| pg.value().clone())
+        let guilds = Guilds::extract(ctx, action, p).await?;
+        guilds.get(&guild_id).await
     }
 }
 
@@ -90,8 +66,8 @@ impl Extractor<CommandAction> for Pointer<PartialGuild> {
 impl Extractor<CommandAction> for PartialGuild {
     async fn extract(ctx: &Context, action: &CommandAction, p: &Pointer<Parser>) -> Option<Self> {
         let guild_id = GuildId::extract(ctx, action, p).await?;
-        let Guilds(guilds) = Guilds::extract(ctx, action, p).await?;
-        match guilds.read().await.get(&guild_id) {
+        let guilds = Guilds::extract(ctx, action, p).await?;
+        match guilds.get(&guild_id).await {
             Some(guild) => Some(guild.make_clone().await),
             None => None,
         }
@@ -105,13 +81,18 @@ impl Extractor<Event> for PartialGuild {
             Event::GuildUpdate(guild_update) => Some(guild_update.guild.clone()),
             Event::GuildDelete(guild_delete) => {
                 let guild_id = guild_delete.guild.id;
-                let Guilds(guilds) = Guilds::extract(ctx, ev, p).await?;
-                match guilds.read().await.get(&guild_id) {
-                    Some(guild) => Some(guild.read().await.clone()),
+                let guilds = Guilds::extract(ctx, ev, p).await?;
+                let guild = guilds.get(&guild_id).await?;
+                Some(guild.make_clone().await)
+            }
+            _ => {
+                let guild_id = GuildId::extract(ctx, ev, p).await?;
+                let guilds = Guilds::extract(ctx, ev, p).await?;
+                match guilds.get(&guild_id).await {
+                    Some(guild) => Some(guild.make_clone().await),
                     None => None,
                 }
             }
-            _ => None,
         }
     }
 }

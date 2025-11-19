@@ -1,3 +1,4 @@
+mod channel;
 mod guild;
 mod member;
 mod message;
@@ -15,10 +16,17 @@ pub fn create_event_handler(shard_count: usize) -> EventManager {
     event_manager.add_handler(DiscordEvent::MessageDelete, message::delete);
 
     event_manager.add_handler(DiscordEvent::GuildCreate, guild::create);
+    event_manager.add_handler(DiscordEvent::GuildCreate, guild::get_voices);
     event_manager.add_handler(DiscordEvent::GuildUpdate, guild::update);
     event_manager.add_handler(DiscordEvent::GuildDelete, guild::delete);
 
-    event_manager.add_handler(DiscordEvent::VoiceStateUpdate, voice_states::update);
+    event_manager.add_handler(DiscordEvent::ChannelCreate, channel::create);
+    event_manager.add_handler(DiscordEvent::ChannelUpdate, channel::update);
+    event_manager.add_handler(DiscordEvent::ChannelDelete, channel::delete);
+
+    event_manager.add_handler(DiscordEvent::VoiceStateUpdate, voice_states::channels);
+    event_manager.add_handler(DiscordEvent::VoiceStateUpdate, voice_states::create);
+    event_manager.add_handler(DiscordEvent::VoiceStateUpdate, voice_states::delete);
 
     event_manager.add_handler(DiscordEvent::GuildMemberAdd, member::add_member);
     event_manager.add_handler(DiscordEvent::GuildMemberRemove, member::subtract_member);

@@ -11,19 +11,48 @@ use crate::{cache::HTTPGetter, cached, command::CommandAction, extractors::Extra
 cached!(Channels, HashMap<ChannelId, GuildChannel>, GuildId);
 
 #[async_trait]
-impl HTTPGetter<GuildId, HashMap<ChannelId, GuildChannel>> for Channels {
+impl HTTPGetter<GuildId, Pointer<HashMap<ChannelId, GuildChannel>>> for Channels {
     async fn fetch(
         &self,
         http: &Arc<serenity::http::Http>,
         key: GuildId,
-    ) -> Option<HashMap<ChannelId, GuildChannel>> {
-        match key.channels(http).await {
+    ) -> Option<Pointer<HashMap<ChannelId, GuildChannel>>> {
+        match self.get(key).await {
+            Some(channels) => Some(channels),
+            None => match key.channels(http).await {
+                Ok(channels) => {
+                    self.insert(key, channels.clone()).await;
+                    self.get(key).await
+                }
+                Err(err) => {
+                    error!("Failed to fetch channels from guild {}: {}", key, err);
+                    None
+                }
+            },
+        }
+    }
+}
+
+#[async_trait]
+impl HTTPGetter<(GuildId, ChannelId), GuildChannel> for Channels {
+    async fn fetch(
+        &self,
+        http: &Arc<serenity::http::Http>,
+        key: (GuildId, ChannelId),
+    ) -> Option<GuildChannel> {
+        if let Some(channels) = self.get(key.0).await {
+            return channels.read().await.get(&key.1).cloned();
+        }
+        match key.0.channels(http).await {
             Ok(channels) => {
-                self.insert(key, channels.clone()).await;
-                Some(channels)
+                self.insert(key.0, channels).await;
+                match self.get(key.0).await {
+                    Some(channels) => channels.read().await.get(&key.1).cloned(),
+                    None => None,
+                }
             }
             Err(err) => {
-                error!("Failed to fetch channels from guild {}: {}", key, err);
+                error!("Failed to fetch channels from guild {}: {}", key.0, err);
                 None
             }
         }
@@ -33,12 +62,22 @@ impl HTTPGetter<GuildId, HashMap<ChannelId, GuildChannel>> for Channels {
 #[async_trait]
 impl Extractor<Event> for GuildChannel {
     async fn extract(ctx: &Context, ev: &Event, p: &Pointer<Parser>) -> Option<Self> {
-        let (guild_id, channel_id) = get_ids(ctx, ev, p).await?;
-        let channels = Channels::extract(ctx, ev, p).await?;
-        channels
-            .fetch(&ctx.http, guild_id)
-            .await
-            .and_then(|map| map.get(&channel_id).cloned())
+        match ev {
+            Event::ChannelUpdate(channel) => {
+                return Some(channel.channel.clone());
+            }
+            Event::ChannelCreate(channel) => {
+                return Some(channel.channel.clone());
+            }
+            _ => {
+                let channels = Channels::extract(ctx, ev, p).await?;
+                let (guild_id, channel_id) = get_ids(ctx, ev, p).await?;
+                match channels.fetch(&ctx.http, guild_id).await {
+                    Some(map) => map.read().await.get(&channel_id).cloned(),
+                    None => None,
+                }
+            }
+        }
     }
 }
 
@@ -47,10 +86,10 @@ impl Extractor<CommandAction> for GuildChannel {
     async fn extract(ctx: &Context, action: &CommandAction, p: &Pointer<Parser>) -> Option<Self> {
         let (guild_id, channel_id) = get_ids(ctx, action, p).await?;
         let channels = Channels::extract(ctx, action, p).await?;
-        channels
-            .fetch(&ctx.http, guild_id)
-            .await
-            .and_then(|map| map.get(&channel_id).cloned())
+        match channels.fetch(&ctx.http, guild_id).await {
+            Some(map) => map.read().await.get(&channel_id).cloned(),
+            None => None,
+        }
     }
 }
 

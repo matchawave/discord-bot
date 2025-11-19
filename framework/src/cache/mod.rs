@@ -11,9 +11,10 @@ use serenity::{
     prelude::{TypeMap, TypeMapKey},
 };
 pub use user::*;
+use utils::Http;
 pub use voice_state::*;
 
-use crate::sharded_data;
+use crate::{DataExtractable, sharded_data};
 
 sharded_data!(Cache, Caches, { set_caches });
 
@@ -25,90 +26,67 @@ impl TypeMapKey for Caches {
 #[macro_export]
 macro_rules! cached {
     ($struct_name: ident, $cache_type:ty, $key_type:ty) => {
-        pub struct $struct_name(
-            utils::Pointer<moka::future::Cache<$key_type, utils::Pointer<$cache_type>>>,
-        );
+        use $crate::DataExtractable;
+
+        pub struct $struct_name(moka::future::Cache<$key_type, utils::Pointer<$cache_type>>);
 
         impl serenity::prelude::TypeMapKey for $struct_name {
-            type Value =
-                utils::Pointer<moka::future::Cache<$key_type, utils::Pointer<$cache_type>>>;
+            type Value = moka::future::Cache<$key_type, utils::Pointer<$cache_type>>;
         }
 
         impl $struct_name {
-            pub fn init(cache: &mut serenity::prelude::TypeMap) {
-                cache.insert::<$struct_name>(utils::Pointer::new(
-                    moka::future::Cache::builder()
-                        .max_capacity(100_000)
-                        .time_to_live(std::time::Duration::from_secs(60 * 60 * 12))
-                        .build(),
-                ));
-            }
-
-            pub async fn retrieve(cache: &std::sync::Arc<serenity::prelude::TypeMap>) -> Self {
-                cache
-                    .get::<$struct_name>()
-                    .cloned()
-                    .map($struct_name)
-                    .expect(concat!(stringify!($struct_name), " cache not initialized"))
-            }
-
             pub async fn insert(&self, key: $key_type, value: $cache_type) {
-                self.0
-                    .write()
-                    .await
-                    .insert(key, utils::Pointer::new(value))
-                    .await;
+                self.0.insert(key, utils::Pointer::new(value)).await;
             }
 
             pub async fn remove(&self, key: $key_type) {
-                self.0.write().await.invalidate(&key).await;
+                self.0.invalidate(&key).await;
             }
 
             pub async fn get(&self, key: $key_type) -> Option<utils::Pointer<$cache_type>> {
-                self.0.read().await.get(&key).await.map(|v| v.clone())
+                self.0.get(&key).await.map(|v| v.clone())
+            }
+
+            pub async fn get_cloned(&self, key: $key_type) -> Option<$cache_type>
+            where
+                $cache_type: Clone,
+            {
+                match self.get(key).await {
+                    Some(v) => Some(v.make_clone().await),
+                    None => None,
+                }
             }
 
             pub async fn contains(&self, key: $key_type) -> bool {
-                self.0.read().await.contains_key(&key)
+                self.0.contains_key(&key)
             }
 
             pub async fn vec(
                 &self,
             ) -> Vec<(std::sync::Arc<$key_type>, utils::Pointer<$cache_type>)> {
-                self.0
-                    .read()
-                    .await
-                    .iter()
-                    .map(|(k, v)| (k.clone(), v.clone()))
-                    .collect()
+                self.0.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+            }
+        }
+
+        impl DataExtractable for $struct_name {
+            fn init(map: &mut serenity::prelude::TypeMap) {
+                map.insert::<$struct_name>(moka::future::Cache::builder().build());
+            }
+
+            fn retrieve(map: &std::sync::Arc<serenity::prelude::TypeMap>) -> Option<Self> {
+                map.get::<$struct_name>().cloned().map(Self)
             }
         }
 
         #[serenity::async_trait]
-        impl $crate::extractors::Extractor<serenity::all::Event> for $struct_name {
+        impl<T: std::marker::Sync> $crate::extractors::Extractor<T> for $struct_name {
             async fn extract(
                 ctx: &serenity::all::Context,
-                ev: &serenity::all::Event,
+                ev: &T,
                 p: &utils::Pointer<utils::Parser>,
             ) -> Option<Self> {
                 let cache = $crate::cache::Cache::extract(ctx, ev, p).await?;
-                let data = cache.0.clone();
-                let cached = data.get::<$struct_name>()?.clone();
-                Some($struct_name(cached))
-            }
-        }
-
-        #[serenity::async_trait]
-        impl $crate::extractors::Extractor<$crate::command::CommandAction> for $struct_name {
-            async fn extract(
-                ctx: &serenity::all::Context,
-                action: &$crate::command::CommandAction,
-                p: &utils::Pointer<utils::Parser>,
-            ) -> Option<Self> {
-                let cache = $crate::cache::Cache::extract(ctx, action, p).await?;
-                let data = cache.0.clone();
-                let cached = data.get::<$struct_name>()?.clone();
-                Some($struct_name(cached))
+                Self::retrieve(&cache.0)
             }
         }
     };
@@ -116,10 +94,10 @@ macro_rules! cached {
 
 #[async_trait]
 pub trait HTTPGetter<Key, T> {
-    async fn fetch(&self, http: &Arc<serenity::http::Http>, key: Key) -> Option<T>;
+    async fn fetch(&self, http: &Http, key: Key) -> Option<T>;
 }
 
-pub fn set_caches(data: &mut serenity::prelude::TypeMap) {
+pub fn set_caches(data: &mut TypeMap) {
     Channels::init(data);
     Messages::init(data);
     Members::init(data);

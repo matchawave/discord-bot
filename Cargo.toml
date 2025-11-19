@@ -18,19 +18,19 @@ debug = false
 incremental = false
 
 [workspace]
-members = [ "main", "utils", "framework" ]
+members = ["main", "utils", "framework", "macros"]
 default-members = ["main"]
 resolver = "2"
 
 [workspace.dependencies]
 chrono = { version = "0.4", features = ["serde"] }
 regex = "1.12"
-colored  = { version = "3" }
+colored = { version = "3" }
 dashmap = "6.1.0"
 moka = { version = "0.12", features = ["future"] }
 serde = { version = "1", features = ["derive"] }
-serde_json = { version = "1"}
-rayon = { version = "1"}
+serde_json = { version = "1" }
+rayon = { version = "1" }
 
 [workspace.dependencies.tokio]
 version = "1"
@@ -40,8 +40,8 @@ default-features = false
 [workspace.dependencies.serenity]
 version = "0.12.4"
 default-features = false
-features=[
-    'rustls_backend', 
+features = [
+    'rustls_backend',
     "chrono",
     "builder",
     "client",

@@ -4,12 +4,14 @@ use framework::{
 };
 use serenity::all::{CreateEmbedAuthor, Member, UserId};
 use utils::Http;
+mod configuration;
 mod example;
 mod utilities;
 
 pub fn create_command_handler() -> CommandManager {
     let command_manager = CommandManager::default();
     command_manager.insert_all(utilities::module());
+    command_manager.insert_all(configuration::module());
     command_manager
 }
 

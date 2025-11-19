@@ -60,6 +60,19 @@ impl<T> Clone for Pointer<T> {
     }
 }
 
+impl<T> From<T> for Pointer<T> {
+    fn from(value: T) -> Self {
+        Self::new(value)
+    }
+}
+
+impl<T> Deref for Pointer<T> {
+    type Target = Arc<RwLock<T>>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 #[derive(Debug)]
 pub struct ElapsedTime {
     start: std::time::Instant,

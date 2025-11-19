@@ -3,10 +3,30 @@ pub mod command;
 pub mod data;
 pub mod event;
 pub mod extractors;
-mod global;
+pub mod global;
 pub mod processes;
 
-use serenity::async_trait;
+pub use macros::*;
+use tokio::sync::RwLock;
+
+use std::sync::Arc;
+
+use serenity::{async_trait, prelude::TypeMap};
+
+pub trait DataExtractable {
+    fn init(map: &mut TypeMap);
+    fn retrieve(map: &Arc<TypeMap>) -> Option<Self>
+    where
+        Self: Sized;
+}
+
+#[async_trait]
+pub trait GlobalExtractable {
+    fn init(map: &mut TypeMap);
+    async fn retrieve(map: &Arc<RwLock<TypeMap>>) -> Option<Self>
+    where
+        Self: Sized;
+}
 
 #[async_trait]
 pub trait HandlerFn<T, U>: Send + Sync + 'static {

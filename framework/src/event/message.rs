@@ -1,4 +1,4 @@
-use serenity::all::{Context, Message, MessageUpdateEvent, PartialGuild};
+use serenity::all::{Context, Message, MessageUpdateEvent};
 use utils::{Parser, Pointer, error};
 
 use crate::command::{CommandExecution, CommandManager};

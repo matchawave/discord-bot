@@ -12,7 +12,7 @@ use serenity::all::{
     FormattedTimestamp, FormattedTimestampStyle, Member, Mentionable, PartialGuild, Permissions,
     Role, RoleId, UserId,
 };
-use std::{collections::HashMap, option};
+use std::collections::HashMap;
 use utils::{Http, MemberOption, PERMISSION_PRIORITY, command_error};
 
 const NAME: &str = "info";
