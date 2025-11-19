@@ -3,16 +3,13 @@ use framework::{
     global::UserConfigHash,
 };
 use serenity::all::{
-    ChannelId, ChannelType, CreateChannel, GuildId, Member, PartialGuild, User, VoiceState,
+    ChannelId, ChannelType, CreateChannel, GuildId, Member, PartialGuild, VoiceState,
 };
 use utils::{Formatter, Http, Parser, Pointer, debug, error};
 
 use crate::{
-    data::{
-        voice_channels::ChannelMembers,
-        voice_master::{self, VoiceMasters},
-    },
-    global::VoiceConfig,
+    configs::VoiceConfig,
+    data::{voice_channels::ChannelMembers, voice_master::VoiceMasters},
 };
 
 pub async fn channels(
@@ -76,7 +73,7 @@ pub async fn delete(
     if let Some(old_channel) = channels.get(&channel_id)
         && old_channel.kind == ChannelType::Voice // Ensure it was a voice channel
         && let Some(voice_master) = voice_masters.get_cloned(guild_id).await // Get voice master config
-        && voice_master.is_active(channel_id) // Check if it was an active channel
+        && voice_master.get_active(channel_id).is_some() // Check if it was an active channel
         && voice_master.is_master(channel_id).is_none() // Ensure it is not a master channel
         && let Some(members) = channel_members.get_cloned(guild_id, channel_id).await
         && members.is_empty() // Check if channel is now empty
@@ -85,7 +82,7 @@ pub async fn delete(
         channel_members.remove_channel(guild_id, channel_id).await; // Clean up channel members data
         {
             let mut voice_master = voice_master_ptr.write().await;
-            voice_master.remove_active_channel(channel_id); // Remove from active channels
+            voice_master.remove_active(channel_id); // Remove from active channels
         }
         if let Err(e) = http
             .delete_channel(channel_id, Some("Voice master cleanup"))
@@ -159,12 +156,12 @@ pub async fn create(
             return; // Not a voice channel (technical not possible, but just in case)
         }
 
-        let config = match voice_master.config().cloned() {
-            Some(c) => Some(c),
+        let config = match voice_master.get_config(new_channel_id) {
+            Some(c) => Some(c.clone()),
             None => configs.get_cloned(guild_id, member.user.id).await,
         };
 
-        let parent_id = master.category.or(new_channel.parent_id);
+        let parent_id = master.or(new_channel.parent_id);
 
         let channel = create_channel(
             member.user.name.clone(),
@@ -186,7 +183,7 @@ pub async fn create(
 
                 if let Some(voice_master_ptr) = voice_masters.get(&guild_id).await {
                     let mut voice_master = voice_master_ptr.write().await;
-                    voice_master.add_active_channel(created.id, member.user.id);
+                    voice_master.insert_active(created.id, member.user.id);
                 }
                 // Move user to new channel
                 if let Err(e) = guild_id.move_member(http, member.user.id, created.id).await {

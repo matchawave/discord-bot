@@ -1,5 +1,5 @@
 use framework::cache::Channels;
-use serenity::all::{ChannelId, GuildChannel, GuildId};
+use serenity::all::{GuildChannel, GuildId};
 use utils::{Http, error};
 
 pub async fn create(http: Http, guild_id: GuildId, channel: GuildChannel, channels: Channels) {

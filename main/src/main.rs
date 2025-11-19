@@ -8,6 +8,7 @@ use serenity::{
 use crate::{cache::set_sharded_cache, data::set_sharded_data, global::set_global};
 mod cache;
 mod commands;
+mod configs;
 mod data;
 mod events;
 mod extractors;

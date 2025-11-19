@@ -14,10 +14,14 @@ dashmap = { workspace = true }
 colored = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+serde_with = { version = "3.16" }
 fastrand = "2.3"
 
 tokio = { workspace = true }
-tokio-tungstenite = { version = "0.27", default-features = false, features = ['rustls', 'connect']}
+tokio-tungstenite = { version = "0.27", default-features = false, features = [
+    'rustls',
+    'connect',
+] }
 rayon = { workspace = true }
 
 utils = { path = "../utils" }
