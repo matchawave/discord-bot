@@ -75,6 +75,10 @@ impl Extractor<Event> for GuildId {
                 Interaction::Modal(modal) => modal.guild_id,
                 _ => None,
             },
+            Event::ReactionAdd(react) => react.reaction.guild_id,
+            Event::ReactionRemove(react) => react.reaction.guild_id,
+            Event::ReactionRemoveAll(env) => env.guild_id,
+            Event::ReactionRemoveEmoji(env) => env.reaction.guild_id,
 
             Event::Unknown(_env) => None,
             _ => None,
