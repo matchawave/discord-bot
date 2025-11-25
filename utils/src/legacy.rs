@@ -80,6 +80,12 @@ legacy_option! {
             .map_err(|_| ResponseError::new(format!("Invalid integer value: `{}`", s)))?;
         Ok(Self(number))
     };
+    NumberOption, f64, |s: &str| {
+        let number: f64 = s
+            .parse()
+            .map_err(|_| ResponseError::new(format!("Invalid number value: `{}`", s)))?;
+        Ok(Self(number))
+    };
     BooleanOption, bool, |s: &str| {
         let value = s.to_lowercase();
         let boolean = match value.as_str() {

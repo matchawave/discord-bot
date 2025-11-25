@@ -7,7 +7,7 @@ use serenity::{
 };
 use utils::{Parser, Pointer};
 
-use crate::{DataExtractable, data::Data, extractors::Extractor};
+use crate::{Extractable, data::Data, extractors::Extractor};
 
 #[derive(Debug, Hash, Eq, PartialEq)]
 pub enum ServerPrefix {
@@ -52,7 +52,7 @@ impl Prefixes {
     }
 }
 
-impl DataExtractable for Prefixes {
+impl Extractable for Prefixes {
     fn init(map: &mut TypeMap) {
         let mut prefixes = HashMap::new();
         prefixes.insert(ServerPrefix::Default, Pointer::new("!".to_string()));

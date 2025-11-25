@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use framework::{DataExtractable, DefaultExtract, extractors::Extractor};
+use framework::{DataExtract, DataExtractable, Extractable, extractors::Extractor};
 use serenity::{
     all::{GuildId, Member, UserId},
     prelude::TypeMapKey,
@@ -9,7 +9,7 @@ use utils::{MemberData, Pointer};
 
 type MemberDataMap = HashMap<UserId, MemberData>;
 
-#[derive(Clone, Default, DataExtractable, DefaultExtract)]
+#[derive(Clone, Default, DataExtractable, DataExtract)]
 pub struct MembersInfo(Pointer<HashMap<GuildId, Pointer<MemberDataMap>>>);
 
 impl MembersInfo {

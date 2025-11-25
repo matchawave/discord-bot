@@ -24,7 +24,7 @@ use tokio::sync::RwLock;
 use utils::{ElapsedTime, Parser, Pointer, ResponseError, debug, error, info};
 
 use crate::{
-    DataExtractable,
+    Extractable,
     cache::Members,
     command::response::CommandResponse,
     data::{Data, Ephemeral, Ephemerals, Prefixes},
@@ -95,7 +95,7 @@ impl CommandManager {
         }
 
         if let Err(e) = http.create_guild_commands(dev_guild, &commands).await {
-            error!("Failed to register commands: {}", e);
+            panic!("Failed to register commands: {}", e);
         }
 
         info!(
@@ -158,7 +158,7 @@ impl CommandExecution<Message> for CommandManager {
         }
 
         let callbacks = &command.callbacks;
-        if let Some(cooldown) = command.cooldown {}
+        // if let Some(cooldown) = command.cooldown {}
         for callback in callbacks.iter() {
             let CommandCallbackType::Legacy(func) = callback else {
                 continue;

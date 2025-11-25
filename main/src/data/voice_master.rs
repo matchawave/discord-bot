@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use framework::{DataExtractable, DefaultExtract, extractors::Extractor};
+use framework::{DataExtract, Extractable, extractors::Extractor};
 
 use serenity::{
     all::{ChannelId, GuildId},
@@ -10,7 +10,7 @@ use utils::Pointer;
 
 use crate::configs::{VoiceConfig, VoiceMasterConfig};
 
-#[derive(Clone, Default, DefaultExtract)]
+#[derive(Clone, Default, DataExtract)]
 pub struct VoiceMasters(Pointer<HashMap<GuildId, Pointer<VoiceMasterConfig>>>);
 
 impl VoiceMasters {
@@ -42,7 +42,7 @@ impl TypeMapKey for VoiceMasters {
     type Value = Pointer<HashMap<GuildId, Pointer<VoiceMasterConfig>>>;
 }
 
-impl DataExtractable for VoiceMasters {
+impl Extractable for VoiceMasters {
     fn init(map: &mut TypeMap) {
         let mut data = HashMap::new();
         let channel_id = ChannelId::from(851183230359306251);

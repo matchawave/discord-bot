@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use framework::{DataExtractable, DefaultExtract, extractors::Extractor};
+use framework::{DataExtract, DataExtractable, Extractable, extractors::Extractor};
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use serenity::{
     all::{ChannelId, GuildId, UserId},
@@ -10,7 +10,7 @@ use utils::{Pointer, debug, info};
 
 type VoiceChannelMembers = Vec<UserId>;
 
-#[derive(Clone, DataExtractable, DefaultExtract)]
+#[derive(Clone, DataExtractable, DataExtract)]
 pub struct ChannelMembers(Pointer<HashMap<(GuildId, ChannelId), Pointer<VoiceChannelMembers>>>);
 
 impl TypeMapKey for ChannelMembers {

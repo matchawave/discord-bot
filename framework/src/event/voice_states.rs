@@ -1,7 +1,7 @@
 use serenity::all::{Context, VoiceState};
 
 use crate::{
-    DataExtractable,
+    Extractable,
     cache::{Cache, VoiceStates},
 };
 

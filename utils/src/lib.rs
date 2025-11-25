@@ -13,10 +13,13 @@ pub use logging::*;
 pub use pagination::*;
 pub use parser::*;
 pub use permissions::*;
-use serenity::all::{Member, Timestamp};
+use serenity::{
+    all::{Member, Timestamp},
+    prelude::TypeMapKey,
+};
 use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct Pointer<T>(Arc<RwLock<T>>);
 
 impl<T> Pointer<T> {
@@ -71,6 +74,16 @@ impl<T> Deref for Pointer<T> {
     fn deref(&self) -> &Self::Target {
         &self.0
     }
+}
+
+impl<T: Default> Default for Pointer<T> {
+    fn default() -> Self {
+        Self::new(T::default())
+    }
+}
+
+impl<T: Send + Sync + 'static> TypeMapKey for Pointer<T> {
+    type Value = Pointer<T>;
 }
 
 #[derive(Debug)]

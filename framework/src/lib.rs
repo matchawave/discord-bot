@@ -13,7 +13,7 @@ use std::sync::Arc;
 
 use serenity::{async_trait, prelude::TypeMap};
 
-pub trait DataExtractable {
+pub trait Extractable {
     fn init(map: &mut TypeMap);
     fn retrieve(map: &Arc<TypeMap>) -> Option<Self>
     where

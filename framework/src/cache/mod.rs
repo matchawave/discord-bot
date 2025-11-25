@@ -7,6 +7,7 @@ use std::sync::Arc;
 pub use channel::*;
 pub use message::*;
 use serenity::{
+    all::{ChannelId, GuildId, UserId},
     async_trait,
     prelude::{TypeMap, TypeMapKey},
 };
@@ -14,7 +15,7 @@ pub use user::*;
 use utils::Http;
 pub use voice_state::*;
 
-use crate::{DataExtractable, sharded_data};
+use crate::{CacheExtractable, Extractable, sharded_data};
 
 sharded_data!(Cache, Caches, { set_caches });
 
@@ -26,8 +27,10 @@ impl TypeMapKey for Caches {
 #[macro_export]
 macro_rules! cached {
     ($struct_name: ident, $cache_type:ty, $key_type:ty) => {
-        use $crate::DataExtractable;
+        use $crate::{CacheExtract, CacheExtractable, Extractable};
 
+        #[derive(CacheExtractable, CacheExtract, Clone)]
+        #[cache(capacity = 100000, live = "24h")]
         pub struct $struct_name(moka::future::Cache<$key_type, utils::Pointer<$cache_type>>);
 
         impl serenity::prelude::TypeMapKey for $struct_name {
@@ -67,28 +70,6 @@ macro_rules! cached {
                 self.0.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
             }
         }
-
-        impl DataExtractable for $struct_name {
-            fn init(map: &mut serenity::prelude::TypeMap) {
-                map.insert::<$struct_name>(moka::future::Cache::builder().build());
-            }
-
-            fn retrieve(map: &std::sync::Arc<serenity::prelude::TypeMap>) -> Option<Self> {
-                map.get::<$struct_name>().cloned().map(Self)
-            }
-        }
-
-        #[serenity::async_trait]
-        impl<T: std::marker::Sync> $crate::extractors::Extractor<T> for $struct_name {
-            async fn extract(
-                ctx: &serenity::all::Context,
-                ev: &T,
-                p: &utils::Pointer<utils::Parser>,
-            ) -> Option<Self> {
-                let cache = $crate::cache::Cache::extract(ctx, ev, p).await?;
-                Self::retrieve(&cache.0)
-            }
-        }
     };
 }
 
@@ -102,4 +83,21 @@ pub fn set_caches(data: &mut TypeMap) {
     Messages::init(data);
     Members::init(data);
     VoiceStates::init(data);
+}
+
+async fn test() {
+    let cache: moka::future::Cache<(GuildId, ChannelId), Vec<UserId>> =
+        moka::future::Cache::builder()
+            .max_capacity(10000)
+            .time_to_live(std::time::Duration::from_secs(60 * 10))
+            .build();
+
+    cache.invalidate_all();
+
+    match cache.invalidate_entries_if(|e, i| e.0 == GuildId::new(123456789012345678)) {
+        Ok(something) => {}
+        Err(e) => {}
+    }
+
+    // entry.value().push(ChannelId::new(1));
 }

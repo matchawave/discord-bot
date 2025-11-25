@@ -26,3 +26,4 @@ rayon = { workspace = true }
 
 utils = { path = "../utils" }
 framework = { path = "../framework" }
+moka = { workspace = true }

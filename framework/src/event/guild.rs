@@ -2,7 +2,7 @@ use serenity::all::{Context, Guild, PartialGuild, UnavailableGuild};
 use utils::info;
 
 use crate::{
-    DataExtractable,
+    Extractable,
     cache::{Cache, Channels, Members, VoiceStates},
     data::{Data, Guilds},
 };

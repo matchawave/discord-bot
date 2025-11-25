@@ -8,7 +8,7 @@ use serenity::{
 };
 use utils::{Parser, Pointer};
 
-use crate::{DataExtractable, command::CommandAction, data::Data, extractors::Extractor};
+use crate::{Extractable, command::CommandAction, data::Data, extractors::Extractor};
 
 type GuildMap = DashMap<GuildId, Pointer<PartialGuild>>;
 pub struct Guilds(Pointer<GuildMap>);
@@ -30,7 +30,7 @@ impl Guilds {
     }
 }
 
-impl DataExtractable for Guilds {
+impl Extractable for Guilds {
     fn init(map: &mut TypeMap) {
         map.insert::<Guilds>(Pointer::new(DashMap::new()));
     }

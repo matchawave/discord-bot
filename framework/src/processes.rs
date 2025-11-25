@@ -9,14 +9,14 @@ use tokio::sync::RwLock;
 use utils::{error, info};
 
 use crate::{
-    DataExtractable,
+    Extractable,
     data::{Cooldowns, Ephemerals},
 };
 
 #[macro_export]
 macro_rules! build_process {
     ($name:ident, $ty:ty) => {
-        use $crate::DataExtractable;
+        use $crate::{DataExtractable, Extractable};
 
         #[derive(Clone, Default, DataExtractable)]
         pub struct $name(pub utils::Pointer<$ty>);

@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use serenity::prelude::{TypeMap, TypeMapKey};
 
-use crate::{DataExtractable, sharded_data};
+use crate::{Extractable, sharded_data};
 
 struct Datas;
 impl TypeMapKey for Datas {

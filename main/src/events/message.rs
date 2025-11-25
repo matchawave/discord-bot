@@ -1,10 +1,10 @@
 use framework::cache::Messages;
-use serenity::all::{Member, Message};
+use serenity::all::{GuildId, Member, Message};
 use utils::debug;
 
-use crate::data::snipe::{EditSnipes, Snipes};
+use crate::cache::snipe::{EditSnipes, Snipes};
 
-pub async fn create(msg: Message, _messages: Messages, member: Member) {
+pub async fn create(guild_id: GuildId, msg: Message, _messages: Messages, member: Member) {
     if member.user.bot {
         return;
     }
@@ -13,7 +13,13 @@ pub async fn create(msg: Message, _messages: Messages, member: Member) {
     println!("Received message: {}", content);
 }
 
-pub async fn update(update_msg: Message, messages: Messages, snipes: EditSnipes, member: Member) {
+pub async fn update(
+    guild_id: GuildId,
+    update_msg: Message,
+    messages: Messages,
+    snipes: EditSnipes,
+    member: Member,
+) {
     if member.user.bot {
         return;
     }
@@ -26,7 +32,7 @@ pub async fn update(update_msg: Message, messages: Messages, snipes: EditSnipes,
     debug!("Updated message id {} in cache", message_id);
 }
 
-pub async fn delete(msg: Option<Message>, snipes: Snipes, messages: Messages) {
+pub async fn delete(guild_id: GuildId, msg: Option<Message>, snipes: Snipes, messages: Messages) {
     if let Some(msg) = msg {
         if msg.author.bot {
             return;

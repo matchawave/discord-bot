@@ -13,10 +13,10 @@ pub use bot::*;
 pub use command_options::*;
 pub use shard_manager::*;
 
-use serenity::{all::Context, async_trait};
+use serenity::{all::Context, async_trait, prelude::TypeMapKey};
 use utils::{Parser, Pointer};
 
-use crate::HandlerFn;
+use crate::{GlobalExtractable, HandlerFn};
 
 #[async_trait]
 pub trait Extractor<T>: Sized + Send + Sync + 'static {
@@ -146,3 +146,19 @@ impl_from_request_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N);
 impl_from_request_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O);
 impl_from_request_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P);
 impl_from_request_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q);
+
+#[async_trait]
+impl<T> GlobalExtractable for Pointer<T>
+where
+    Pointer<T>: TypeMapKey<Value = Pointer<T>>,
+    T: Default + Send + Sync + 'static,
+{
+    fn init(map: &mut serenity::prelude::TypeMap) {
+        map.insert::<Pointer<T>>(Pointer::new(T::default()));
+    }
+
+    async fn retrieve(map: &utils::DataType) -> Option<Self> {
+        let data = map.read().await;
+        data.get::<Pointer<T>>().cloned()
+    }
+}
