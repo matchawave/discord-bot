@@ -38,7 +38,7 @@ async fn main() {
         Ok(mut client) => {
             command_manager.register(&client, false).await;
             set_shard_manager(&client).await;
-            processes::start_background_processes(&client, shards).await;
+            processes::start_background_processes(&client).await;
             if let Err(e) = client.start_shards(shards as u32).await {
                 println!("Error starting client: {:?}", e);
             }

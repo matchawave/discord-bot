@@ -1,92 +1,101 @@
 use std::sync::Arc;
 
 use serenity::{
-    all::{Http, ShardId},
+    Client,
+    all::{Context, ShardId},
     async_trait,
-    prelude::TypeMap,
+    prelude::{TypeMap, TypeMapKey},
 };
 use tokio::sync::RwLock;
-use utils::info;
+use utils::{DataType, Http, Pointer, info};
 
-use crate::data::{Cooldowns, Ephemerals};
+use crate::extractors::{ContextExtractor, Extractor};
+
+// use crate::data::{Cooldowns, Ephemerals};
 
 #[macro_export]
 macro_rules! build_process {
     ($name:ident, $ty:ty) => {
-        use $crate::{DataExtractable, Extractable};
-
-        #[derive(Clone, Default)]
-        pub struct $name(pub utils::Pointer<$ty>);
+        #[derive(Default)]
+        pub struct $name(pub tokio::sync::RwLock<$ty>);
 
         impl serenity::prelude::TypeMapKey for $name {
-            type Value = utils::Pointer<$ty>;
-        }
-
-        impl $name {
-            pub async fn
+            type Value = std::sync::Arc<$name>;
         }
     };
 }
 
 pub struct ProcessManager {
-    datas: Arc<RwLock<TypeMap>>,
-    http: Arc<Http>,
-    shards: usize,
-    processes: Vec<Arc<dyn ProcessLoop + Send + Sync>>,
+    data: DataType,
+    http: Http,
+    process_vec: Vec<Arc<dyn ProcessLoop>>,
+    process_map: TypeMap,
 }
 impl ProcessManager {
-    pub fn new(data: Arc<RwLock<TypeMap>>, http: Arc<Http>, shards: usize) -> Self {
+    pub fn new(ctx: &Client) -> Self {
         Self {
-            datas: data,
-            http,
-            shards,
-            processes: Vec::new(),
+            data: ctx.data.clone(),
+            http: ctx.http.clone(),
+            process_vec: Vec::new(),
+            process_map: TypeMap::new(),
         }
     }
+
     pub async fn init_loop(&self) {
-        for shard in 0..self.shards {
+        let data = self.data.clone();
+        info!("(processes) Starting process loop");
+        for p in self.process_vec.iter() {
+            let process = p.clone();
             let http = self.http.clone();
-            let shard = ShardId(shard as u32);
-            let data = self.datas.clone();
-            let processes = Arc::new(self.processes.clone());
-            tokio::spawn(Self::process_loop(shard, data, http, processes));
+            tokio::spawn(async move {
+                loop {
+                    process.process(http.clone()).await;
+                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                }
+            });
         }
     }
 
     pub fn register_process<P>(&mut self, process: P)
     where
-        P: ProcessLoop + Send + Sync + 'static,
+        P: ProcessLoop + 'static,
+        P: TypeMapKey<Value = Arc<P>>,
     {
-        self.processes.push(Arc::new(process));
+        let process_ptr = Arc::new(process);
+        self.process_vec.push(process_ptr.clone());
+        self.process_map.insert::<P>(process_ptr);
     }
 
-    async fn process_loop(
-        shard: ShardId,
-        data: Arc<RwLock<TypeMap>>,
-        http: Arc<Http>,
-        processes: Arc<Vec<Arc<dyn ProcessLoop + Send + Sync>>>,
-    ) {
-        info!("(processes) Starting process loop for shard {}", shard);
-        loop {
-            {
-                let data_read = data.read().await;
-                if let Some(cooldowns) = data_read.get::<Cooldowns>().cloned().map(Cooldowns) {
-                    cooldowns.process(shard, http.clone()).await;
-                }
+    pub fn get<P>(&self) -> Option<Arc<P>>
+    where
+        P: TypeMapKey<Value = Arc<P>> + Send + Sync + 'static,
+    {
+        self.process_map.get::<P>().cloned()
+    }
+}
 
-                if let Some(ephemerals) = data_read.get::<Ephemerals>().cloned().map(Ephemerals) {
-                    ephemerals.process(shard, http.clone()).await;
-                }
-            }
+impl TypeMapKey for ProcessManager {
+    type Value = Arc<ProcessManager>;
+}
 
-            for p in processes.iter() {
-                p.process(shard, http.clone()).await;
-            }
-        }
+#[async_trait]
+impl ContextExtractor for Arc<ProcessManager> {
+    async fn extract_context(ctx: &Context) -> Option<Self> {
+        ctx.data.read().await.get::<ProcessManager>().cloned()
     }
 }
 
 #[async_trait]
-pub trait ProcessLoop {
-    async fn process(&self, shard_id: ShardId, http: utils::Http);
+impl<T> Extractor<T> for Arc<ProcessManager>
+where
+    T: Send + Sync + 'static,
+{
+    async fn extract(ctx: &Context, _: &T, _: &Pointer<utils::Parser>) -> Option<Self> {
+        Arc::<ProcessManager>::extract_context(ctx).await
+    }
+}
+
+#[async_trait]
+pub trait ProcessLoop: Send + Sync {
+    async fn process(&self, http: utils::Http);
 }

@@ -1,4 +1,7 @@
-use std::time::{Duration, Instant};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use framework::{
     data::{Cooldown, Cooldowns},
@@ -174,7 +177,7 @@ pub async fn create(
     VoiceMaster(voice_master_ptr): VoiceMaster,
     channels: Channels,
     configs: UserConfigHash<VoiceConfig>,
-    Cooldowns(cooldowns): Cooldowns,
+    cooldowns: Arc<Cooldowns>,
     parser: Pointer<Parser>,
 ) {
     let v_m = voice_master_ptr.make_clone().await;
@@ -187,14 +190,14 @@ pub async fn create(
         if let Some(cooldown_num) = master.1 {
             // Has a voice chat creating cooldown
             let cooldown = Cooldown::VoiceMaster(guild_id, new_channel_id, member.user.id);
-            if (cooldowns.read().await).get(&cooldown).is_some() {
+            if (cooldowns.0.read().await).get(&cooldown).is_some() {
                 debug!(
                     "User {} in guild {} is on cooldown for creating voice master channels from master channel {}",
                     member.user.id, guild_id, new_channel_id
                 );
                 return;
             } else {
-                (cooldowns.write().await).insert(
+                (cooldowns.0.write().await).insert(
                     cooldown,
                     Instant::now() + Duration::from_millis(cooldown_num),
                 );

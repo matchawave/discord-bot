@@ -20,9 +20,14 @@ use serenity::{
 use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 #[derive(Debug)]
-pub struct Pointer<T>(Arc<RwLock<T>>);
+pub struct Pointer<T: ?Sized>(Arc<RwLock<T>>)
+where
+    T: Send + Sync + 'static;
 
-impl<T> Pointer<T> {
+impl<T> Pointer<T>
+where
+    T: Send + Sync + Sized + 'static,
+{
     pub fn new(inner: T) -> Self {
         Self(Arc::new(RwLock::new(inner)))
     }
@@ -57,32 +62,47 @@ impl<T> Pointer<T> {
     }
 }
 
-impl<T: Clone> Pointer<T> {
+impl<T: Clone> Pointer<T>
+where
+    T: Send + Sync + Sized + 'static,
+{
     pub async fn make_clone(&self) -> T {
         self.0.read().await.clone()
     }
 }
 
-impl<T> Clone for Pointer<T> {
+impl<T> Clone for Pointer<T>
+where
+    T: Send + Sync + Sized + 'static,
+{
     fn clone(&self) -> Self {
         Self(Arc::clone(&self.0))
     }
 }
 
-impl<T> From<T> for Pointer<T> {
+impl<T> From<T> for Pointer<T>
+where
+    T: Send + Sync + Sized + 'static,
+{
     fn from(value: T) -> Self {
         Self::new(value)
     }
 }
 
-impl<T> Deref for Pointer<T> {
+impl<T> Deref for Pointer<T>
+where
+    T: Send + Sync + Sized + 'static,
+{
     type Target = Arc<RwLock<T>>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl<T: Default> Default for Pointer<T> {
+impl<T: Default> Default for Pointer<T>
+where
+    T: Send + Sync + Sized + 'static,
+{
     fn default() -> Self {
         Self::new(T::default())
     }

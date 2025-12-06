@@ -24,7 +24,7 @@ use tokio::sync::RwLock;
 use utils::{ElapsedTime, Parser, Pointer, ResponseError, debug, error, info};
 
 use crate::{
-    Extractable,
+    Extractable, ShardData,
     command::response::CommandResponse,
     data::{
         CommandAliases, Cooldown, Cooldowns, Data, DefaultPrefix, Ephemeral, Ephemerals, Prefix,
@@ -32,6 +32,7 @@ use crate::{
     extractors::{ContextEventExtractor, ContextExtractor, Extractor},
     global::Commands,
     guilds::{GuildMap, Members},
+    processes::ProcessManager,
 };
 
 pub type CommandResult<T = CommandResponse> = Result<Option<T>, ResponseError>;
@@ -186,20 +187,23 @@ impl CommandExecution<Message> for CommandManager {
         }
 
         let callbacks = &command.callbacks;
+        let Some(p_manager) = Arc::<ProcessManager>::extract_context(ctx).await else {
+            error!("Failed to extract ProcessManager from context");
+            return None;
+        };
 
         if let Some(cooldown_num) = command.cooldown
-            && let Some(Data(shard_data)) = Data::extract(ctx, &action, parser).await
-            && let Some(Cooldowns(cooldowns)) = Cooldowns::retrieve(&shard_data)
+            && let Some(cooldowns) = p_manager.get::<Cooldowns>()
         {
             let cooldown = Cooldown::Command(guild_id, msg.author.id, command_name.clone());
-            if (cooldowns.read().await).get(&cooldown).is_some() {
+            if (cooldowns.0.read().await).get(&cooldown).is_some() {
                 debug!(
                     "Command '{}' is on cooldown for user {} in guild {}",
                     command_name, msg.author.id, guild_id
                 );
                 return Some(command_name);
             } else {
-                (cooldowns.write().await).insert(
+                (cooldowns.0.write().await).insert(
                     cooldown,
                     Instant::now() + Duration::from_millis(cooldown_num),
                 );
@@ -207,58 +211,52 @@ impl CommandExecution<Message> for CommandManager {
         }
 
         for callback in callbacks.iter() {
-            let CommandCallbackType::Legacy(func) = callback else {
-                continue;
-            };
-            let Some(response) = func.call(ctx, &action, parser).await else {
-                continue;
-            };
-
-            let mut response_msg: CreateMessage = match (&response).try_into() {
-                Ok(m) => m,
-                Err(e) => {
-                    // This should send the error msg to the channel
-                    error!("Failed to create message from command response: {}", e);
-                    continue;
-                }
-            };
-
-            let attachments = response.get_attachments().clone();
-
-            if response.should_reply() {
-                response_msg = response_msg.reference_message(msg);
-                response_msg = response_msg.allowed_mentions((&response).into()); // Set allowed mentions based on response
-            }
-
-            let possible_channel_id = response.get_channel();
-
-            tokio::spawn({
-                let http = ctx.http.clone();
-                let channel_id = possible_channel_id.unwrap_or(msg.channel_id);
-                let ctx = ctx.clone();
-                let parser = parser.clone();
-                let action = action.clone();
-                async move {
-                    let m = match http
-                        .send_message(channel_id, attachments.clone(), &response_msg)
-                        .await
-                    {
-                        Ok(m) => m,
-                        Err(e) => {
-                            error!("Failed to send command response message: {}", e);
-                            return;
-                        }
-                    };
-
-                    if response.is_ephemeral()
-                        && let Some(Data(shard_data)) = Data::extract(&ctx, &action, &parser).await
-                        && let Some(Ephemerals(ephemerals)) = Ephemerals::retrieve(&shard_data)
-                    {
-                        let mut map = ephemerals.write().await;
-                        map.insert(Ephemeral::new(&m), Instant::now() + Duration::from_secs(3));
+            if let CommandCallbackType::Legacy(func) = callback
+                && let Some(response) = func.call(ctx, &action, parser).await
+            {
+                let mut response_msg: CreateMessage = match (&response).try_into() {
+                    Ok(m) => m,
+                    Err(e) => {
+                        // This should send the error msg to the channel
+                        error!("Failed to create message from command response: {}", e);
+                        continue;
                     }
+                };
+
+                let attachments = response.get_attachments().clone();
+
+                if response.should_reply() {
+                    response_msg = response_msg.reference_message(msg);
+                    response_msg = response_msg.allowed_mentions((&response).into()); // Set allowed mentions based on response
                 }
-            });
+
+                let possible_channel_id = response.get_channel();
+
+                tokio::spawn({
+                    let channel_id = possible_channel_id.unwrap_or(msg.channel_id);
+                    let http = ctx.http.clone();
+                    let p_manager = p_manager.clone();
+                    async move {
+                        let m = match http
+                            .send_message(channel_id, attachments.clone(), &response_msg)
+                            .await
+                        {
+                            Ok(m) => m,
+                            Err(e) => {
+                                error!("Failed to send command response message: {}", e);
+                                return;
+                            }
+                        };
+
+                        if response.is_ephemeral()
+                            && let Some(ephemerals) = p_manager.get::<Ephemerals>()
+                        {
+                            let mut map = ephemerals.0.write().await;
+                            map.insert(Ephemeral::new(&m), Instant::now() + Duration::from_secs(3));
+                        }
+                    }
+                });
+            };
         }
         Some(command_name)
     }

@@ -1,7 +1,7 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use serenity::{
-    all::{ChannelId, Context, Event, GuildId, UserId},
+    all::{ChannelId, Context, Event, GuildId, ShardId, UserId},
     async_trait,
 };
 use utils::{DiscordEvent, Http, Pointer, info};
@@ -9,7 +9,7 @@ use utils::{DiscordEvent, Http, Pointer, info};
 use crate::{
     build_process,
     extractors::{ContextExtractor, Extractor},
-    processes::ProcessLoop,
+    processes::{ProcessLoop, ProcessManager},
 };
 use std::{fmt::Debug, hash::Hash};
 
@@ -49,17 +49,20 @@ impl Cooldown {
 }
 
 #[async_trait]
-impl ContextExtractor for Cooldowns {
+impl ContextExtractor for Arc<Cooldowns> {
     async fn extract_context(ctx: &Context) -> Option<Self> {
-        let data_read = ctx.data.read().await;
-        data_read.get::<Cooldowns>().cloned().map(Self)
+        let p_manager = Arc::<ProcessManager>::extract_context(ctx).await?;
+        p_manager.get::<Cooldowns>()
     }
 }
 
 #[async_trait]
-impl Extractor<Event> for Cooldowns {
-    async fn extract(ctx: &Context, _: &Event, _: &Pointer<utils::Parser>) -> Option<Self> {
-        Cooldowns::extract_context(ctx).await
+impl<T> Extractor<T> for Arc<Cooldowns>
+where
+    T: Send + Sync + 'static,
+{
+    async fn extract(ctx: &Context, _: &T, _: &Pointer<utils::Parser>) -> Option<Self> {
+        Arc::<Cooldowns>::extract_context(ctx).await
     }
 }
 
@@ -67,7 +70,7 @@ impl Extractor<Event> for Cooldowns {
 impl ProcessLoop for Cooldowns {
     async fn process(&self, _http: Http) {
         let now = std::time::Instant::now();
-        let map = self.0.make_clone().await;
+        let map = self.0.read().await.clone();
         for (key, &time) in map.iter() {
             if now > time {
                 match (key.guild(), key.user()) {

@@ -22,6 +22,4 @@ impl TypeMapKey for Datas {
 sharded_data!(Data, Datas, { set_sharded_data });
 pub fn set_sharded_data(data: &mut serenity::prelude::TypeMap) {
     Guilds::init(data);
-    Cooldowns::init(data);
-    Ephemerals::init(data);
 }

@@ -1,12 +1,16 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use serenity::{
-    all::{ChannelId, Message, MessageId},
+    all::{ChannelId, Context, Message, MessageId, ShardId},
     async_trait,
 };
-use utils::{Pointer, error, info};
+use utils::{Http, Pointer, error, info};
 
-use crate::{build_process, processes::ProcessLoop};
+use crate::{
+    build_process,
+    extractors::{ContextExtractor, Extractor},
+    processes::{ProcessLoop, ProcessManager},
+};
 
 build_process!(Ephemerals, HashMap<Ephemeral, std::time::Instant>);
 
@@ -30,8 +34,8 @@ impl Ephemeral {
 
 #[async_trait]
 impl ProcessLoop for Ephemerals {
-    async fn process(&self, http: std::sync::Arc<serenity::http::Http>) {
-        let map = self.0.make_clone().await;
+    async fn process(&self, http: Http) {
+        let map = self.0.read().await.clone();
         let now = std::time::Instant::now();
         for (key, &time) in map.iter() {
             if now > time {
@@ -56,5 +60,23 @@ impl ProcessLoop for Ephemerals {
                 map.remove(key);
             }
         }
+    }
+}
+
+#[async_trait]
+impl ContextExtractor for Arc<Ephemerals> {
+    async fn extract_context(ctx: &Context) -> Option<Self> {
+        let p_manager = Arc::<ProcessManager>::extract_context(ctx).await?;
+        p_manager.get::<Ephemerals>()
+    }
+}
+
+#[async_trait]
+impl<T> Extractor<T> for Arc<Ephemerals>
+where
+    T: Send + Sync + 'static,
+{
+    async fn extract(ctx: &Context, _: &T, _: &Pointer<utils::Parser>) -> Option<Self> {
+        Arc::<Ephemerals>::extract_context(ctx).await
     }
 }
