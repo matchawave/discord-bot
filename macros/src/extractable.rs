@@ -3,8 +3,8 @@ use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::{
-    parse_macro_input, punctuated::Punctuated, Data, DeriveInput, Fields, Lit, LitInt,
-    PathArguments, Token, Type,
+    parse_macro_input, punctuated::Punctuated, Data, DeriveInput, Fields, Lit, PathArguments,
+    Token, Type,
 };
 
 use crate::misc::CacheAttribute;
@@ -43,19 +43,15 @@ pub fn cache_extractable(input: TokenStream) -> TokenStream {
 
     let expanded = quote! {
         #[serenity::async_trait]
-        impl Extractable for #name {
-            fn init(map: &mut serenity::prelude::TypeMap) {
-                map.insert::<Self>(
+        impl Default for #name {
+            fn default() -> Self {
+                #name(
                     moka::future::Cache::builder()
                         #max_capacity
                         #time_to_live
                         #time_to_idle
                         .build()
-                );
-            }
-
-            fn retrieve(map: &std::sync::Arc<serenity::prelude::TypeMap>) -> Option<Self> {
-                map.get::<Self>().cloned().map(Self)
+                )
             }
         }
     };

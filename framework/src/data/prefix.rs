@@ -1,72 +1,66 @@
-use std::{collections::HashMap, sync::Arc};
-
 use serenity::{
     all::{Context, GuildId},
     async_trait,
-    prelude::{TypeMap, TypeMapKey},
+    prelude::TypeMapKey,
 };
+
 use utils::{Parser, Pointer};
 
-use crate::{Extractable, data::Data, extractors::Extractor};
-
-#[derive(Debug, Hash, Eq, PartialEq)]
-pub enum ServerPrefix {
-    Guild(GuildId),
-    Default,
-}
+use crate::{
+    ShardData,
+    extractors::{ContextEventExtractor, ContextExtractor, EventExtractor, Extractor},
+    guilds::Guilds,
+};
 
 #[derive(Clone)]
-pub struct Prefixes(Pointer<HashMap<ServerPrefix, Pointer<String>>>);
+pub struct Prefix(pub Pointer<Option<String>>);
 
-impl TypeMapKey for Prefixes {
-    type Value = Pointer<HashMap<ServerPrefix, Pointer<String>>>;
+pub struct DefaultPrefix(pub String);
+
+impl TypeMapKey for Prefix {
+    type Value = Pointer<Option<String>>;
 }
 
-impl Prefixes {
-    pub async fn get(&self, guild_id: GuildId) -> String {
-        let map = self.0.read().await;
-        if let Some(prefix) = map.get(&ServerPrefix::Guild(guild_id)) {
-            return prefix.read().await.clone();
-        }
-        if let Some(prefix) = map.get(&ServerPrefix::Default) {
-            return prefix.read().await.clone();
-        }
-        "!".to_string()
-    }
-
-    pub async fn get_ptr(&self, guild_id: GuildId) -> Option<Pointer<String>> {
-        let map = self.0.read().await;
-        map.get(&ServerPrefix::Guild(guild_id)).cloned()
-    }
-
-    pub async fn insert<T: Into<String>>(&self, guild_id: GuildId, prefix: T) {
-        let prefix = prefix.into();
-        self.0
-            .write()
+#[async_trait]
+impl<T> ContextEventExtractor<T> for Prefix
+where
+    T: Send + Sync + 'static,
+    GuildId: EventExtractor<T>,
+{
+    async fn extract_context_event(ctx: &Context, ev: &T) -> Option<Self> {
+        let guild_id = GuildId::extract_event(ev).await?;
+        let guilds = Guilds::extract_context(ctx).await?;
+        (guilds.get::<Prefix, Option<String>>(guild_id))
             .await
-            .insert(ServerPrefix::Guild(guild_id), Pointer::new(prefix));
-    }
-
-    pub async fn remove(&self, guild_id: GuildId) {
-        self.0.write().await.remove(&ServerPrefix::Guild(guild_id));
-    }
-}
-
-impl Extractable for Prefixes {
-    fn init(map: &mut TypeMap) {
-        let mut prefixes = HashMap::new();
-        prefixes.insert(ServerPrefix::Default, Pointer::new("!".to_string()));
-        map.insert::<Prefixes>(Pointer::new(prefixes));
-    }
-    fn retrieve(map: &Arc<TypeMap>) -> Option<Self> {
-        map.get::<Prefixes>().cloned().map(Self)
+            .map(Self)
     }
 }
 
 #[async_trait]
-impl<T> Extractor<T> for Prefixes {
+impl<T> Extractor<T> for Prefix
+where
+    T: Send + Sync + 'static,
+    GuildId: EventExtractor<T>,
+{
+    async fn extract(ctx: &Context, ev: &T, _: &Pointer<Parser>) -> Option<Self> {
+        Prefix::extract_context_event(ctx, ev).await
+    }
+}
+
+#[async_trait]
+impl ContextExtractor for DefaultPrefix {
+    async fn extract_context(ctx: &Context) -> Option<Self> {
+        let shard_data = ShardData::get(ctx).await?;
+        Some(Self(shard_data.default_prefix.clone()))
+    }
+}
+
+#[async_trait]
+impl<T> Extractor<T> for DefaultPrefix
+where
+    T: Send + Sync + 'static,
+{
     async fn extract(ctx: &Context, _: &T, _: &Pointer<Parser>) -> Option<Self> {
-        let data = Data::get(&ctx.data, ctx.shard_id).await?;
-        Prefixes::retrieve(&data)
+        DefaultPrefix::extract_context(ctx).await
     }
 }

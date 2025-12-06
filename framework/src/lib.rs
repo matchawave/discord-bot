@@ -1,17 +1,24 @@
-pub mod cache;
 pub mod command;
 pub mod data;
 pub mod event;
 pub mod extractors;
 pub mod global;
+pub mod guilds;
 pub mod processes;
 
 pub use macros::*;
 use tokio::sync::RwLock;
+use utils::Pointer;
 
 use std::sync::Arc;
 
-use serenity::{async_trait, prelude::TypeMap};
+use serenity::{
+    all::{Context, User},
+    async_trait,
+    prelude::{TypeMap, TypeMapKey},
+};
+
+use crate::guilds::Guilds;
 
 pub trait Extractable {
     fn init(map: &mut TypeMap);
@@ -79,3 +86,42 @@ impl_handler_fn!(A, B, C, D, E, F, G, H, I, J, K, L, M, N);
 impl_handler_fn!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O);
 impl_handler_fn!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P);
 impl_handler_fn!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q);
+
+#[derive(Clone)]
+pub struct ShardData {
+    pub guilds: Guilds,
+    default_prefix: String,
+    bot: Pointer<Option<User>>,
+}
+
+impl Default for ShardData {
+    fn default() -> Self {
+        Self {
+            guilds: Guilds::default(),
+            default_prefix: "!".to_string(),
+            bot: Pointer::default(),
+        }
+    }
+}
+
+impl TypeMapKey for ShardData {
+    type Value = Pointer<Vec<ShardData>>;
+}
+
+impl ShardData {
+    pub fn init(shards: usize, map: &mut TypeMap) {
+        let mut data = Vec::with_capacity(shards);
+        for _ in 0..shards {
+            data.push(ShardData::default());
+        }
+        map.insert::<ShardData>(Pointer::new(data));
+    }
+
+    pub async fn get(ctx: &Context) -> Option<ShardData> {
+        let data = ctx.data.read().await;
+        let data = data.get::<ShardData>()?;
+        let shard_id = ctx.shard_id.get() as usize;
+
+        data.read().await.get(shard_id).cloned()
+    }
+}

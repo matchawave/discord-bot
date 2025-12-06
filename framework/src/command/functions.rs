@@ -16,6 +16,7 @@ pub trait CallbackReturn: Send + Sync {
     fn into_response(self: Box<Self>) -> Option<CommandResponse>;
 }
 
+#[derive(Clone)]
 pub enum CommandAction {
     Interaction(Box<CommandInteraction>),
     Message(Box<Message>),

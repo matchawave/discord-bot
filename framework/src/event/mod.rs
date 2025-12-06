@@ -6,6 +6,7 @@ mod voice_states;
 
 use std::sync::Arc;
 
+use colored::Colorize;
 use dashmap::DashMap;
 use serenity::{
     all::{Context, Event, RawEventHandler},
@@ -68,50 +69,61 @@ impl RawEventHandler for EventManager {
 
 async fn worker(mut receiver: Receiver<(Context, Event)>, callbacks: Arc<CallbackMap>) {
     while let Some((ctx, event)) = receiver.recv().await {
-        let parser = Pointer::new(Parser::new(ctx.shard_id));
+        let shard_text = format!("(Shard {})", ctx.shard_id.get()).bold().purple();
+        let seperator = "|".bold().white();
+        let Some(event_name) = event.name() else {
+            // info!("{} {} event received with no name", shard_text, seperator,);
+            continue;
+        };
+
         update_bot(&ctx, &event).await;
         cache_guild(&ctx, &event).await;
 
-        if command_event(&ctx, &event, &parser).await {
+        if command_event(&ctx, &event).await {
             continue;
         }
 
         notify_startup(&ctx, &event).await;
 
         let name = DiscordEvent::from(&event);
-        if let Some(funcs) = callbacks.get(&name) {
+        if let Some(funcs) = callbacks.get(&name)
+            && !funcs.is_empty()
+        {
             let elapsed = ElapsedTime::new();
+            let parser = Pointer::new(Parser::new(ctx.shard_id));
+
+            info!(
+                "{} {} start {} event received",
+                shard_text,
+                seperator,
+                event_name.bold().underline().green()
+            );
+
             for func in funcs.iter() {
                 func.call(&ctx, &event, &parser).await;
             }
-            let shard_text = format!("Shard {}", ctx.shard_id.get());
-            match event.name() {
-                Some(n) => info!(
-                    "({}) {} {} event handled in {:?}ms",
-                    shard_text.bold().purple(),
-                    "|".bold().white(),
-                    n,
-                    elapsed.elapsed_ms()
-                ),
-                None => info!(
-                    "({}) {} event handled in {:?}ms",
-                    "|".bold().white(),
-                    shard_text.bold().purple(),
-                    elapsed.elapsed_ms()
-                ),
-            }
+
+            info!(
+                "{} {} end {} event handled in {:?}ms",
+                shard_text.bold().purple(),
+                seperator,
+                event_name.bold().underline().green(),
+                elapsed.elapsed_ms()
+            );
         }
+
         handle_voice_state_update(&ctx, &event).await;
         delete_guilds(&ctx, &event).await;
     }
 }
 
-async fn command_event(ctx: &Context, event: &Event, parser: &Pointer<Parser>) -> bool {
+async fn command_event(ctx: &Context, event: &Event) -> bool {
+    let parser = Pointer::new(Parser::new(ctx.shard_id));
     let elapsed = ElapsedTime::new();
     if let Some(command_name) = match &event {
-        Event::MessageCreate(e) => message::handle_command(ctx, &e.message, parser).await,
-        Event::MessageUpdate(e) => message::handle_edited_command(ctx, e, parser).await,
-        Event::InteractionCreate(e) => interactions::handle(ctx, &e.interaction, parser).await,
+        Event::MessageCreate(e) => message::handle_command(ctx, &e.message, &parser).await,
+        Event::MessageUpdate(e) => message::handle_edited_command(ctx, e, &parser).await,
+        Event::InteractionCreate(e) => interactions::handle(ctx, &e.interaction, &parser).await,
         _ => None,
     } {
         info!(
@@ -132,6 +144,7 @@ async fn notify_startup(ctx: &Context, event: &Event) {
 
 async fn update_bot(ctx: &Context, event: &Event) {
     if let Event::UserUpdate(e) = event {
+        info!("Bot user updated");
         user::update_bot(ctx, &e.current_user).await;
     }
 }

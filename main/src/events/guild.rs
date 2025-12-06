@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use framework::data::Guilds;
+use framework::guilds::{GuildMap, Guilds};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serenity::all::{
     AfkMetadata, ChannelId, Guild, ImageHash, NsfwLevel, PartialGuild, PremiumTier,
@@ -8,37 +8,28 @@ use serenity::all::{
 };
 use utils::info;
 
-use crate::data::{member::MembersInfo, voice_channels::ChannelMembers};
+use crate::cache::snipe::{EditSnipes, ReactionSnipes, Snipes};
 
-pub async fn create(guild: Guild, guild_members: MembersInfo) {
+pub async fn create(guild: PartialGuild, guild_map: GuildMap) {
     info!("Joined guild {} ({})", guild.name, guild.id);
-    guild_members.insert(guild.id, Default::default()).await;
-}
-
-pub async fn get_voices(guild: Guild, channel_members: ChannelMembers) {
-    for (user_id, state) in guild.voice_states.iter() {
-        if let Some(channel_id) = state.channel_id {
-            channel_members.insert(guild.id, channel_id, *user_id).await;
-        }
-    }
+    let mut map_write = guild_map.write().await;
+    map_write.insert::<Snipes>(Snipes::default().0);
+    map_write.insert::<EditSnipes>(EditSnipes::default().0);
+    map_write.insert::<ReactionSnipes>(ReactionSnipes::default().0);
 }
 
 pub async fn update(guild: PartialGuild, guilds: Guilds) {
-    if let Some(old_guild) = guilds.get(&guild.id).await {
-        let old_guild = old_guild.read().await.clone();
+    if let Some(old_guild_ptr) = guilds.get_ptr::<PartialGuild>(guild.id).await {
+        let old_guild = old_guild_ptr.make_clone().await;
         let changes = find_differences(&old_guild, &guild);
         changes.par_iter().for_each(|c| {
             info!("Guild Update for {} ({}): {}", guild.name, guild.id, c);
         });
+        old_guild_ptr.write().await.clone_from(&guild);
     }
-    guilds.insert(guild).await; // Update the stored guild information
 }
 
-pub async fn delete(
-    unavailable_guild: UnavailableGuild,
-    guild: PartialGuild,
-    guild_members: MembersInfo,
-) {
+pub async fn delete(unavailable_guild: UnavailableGuild, guild: PartialGuild) {
     if unavailable_guild.unavailable {
         info!(
             "Guild {} ({}) got deleted (unavailable)",
@@ -47,7 +38,6 @@ pub async fn delete(
     } else {
         info!("Guild {} ({}) got deleted", guild.name, guild.id);
     }
-    guild_members.remove(&guild.id).await;
 }
 
 enum GuildChange {

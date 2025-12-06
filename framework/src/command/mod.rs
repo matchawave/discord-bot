@@ -25,11 +25,13 @@ use utils::{ElapsedTime, Parser, Pointer, ResponseError, debug, error, info};
 
 use crate::{
     Extractable,
-    cache::Members,
     command::response::CommandResponse,
-    data::{Data, Ephemeral, Ephemerals, Prefixes},
-    extractors::Extractor,
+    data::{
+        CommandAliases, Cooldown, Cooldowns, Data, DefaultPrefix, Ephemeral, Ephemerals, Prefix,
+    },
+    extractors::{ContextEventExtractor, ContextExtractor, Extractor},
     global::Commands,
+    guilds::{GuildMap, Members},
 };
 
 pub type CommandResult<T = CommandResponse> = Result<Option<T>, ResponseError>;
@@ -120,45 +122,90 @@ impl CommandExecution<Message> for CommandManager {
         parser: &Pointer<Parser>,
     ) -> Option<String> {
         let guild_id = msg.guild_id?;
+        let pre_action: CommandAction = CommandAction::from(msg);
 
-        let shard_data = Data::get(&ctx.data, ctx.shard_id).await?;
-        let prefixes = Prefixes::retrieve(&shard_data)?;
-        let prefix = prefixes.get(guild_id).await;
+        let prefix_option = match Prefix::extract_context_event(ctx, &pre_action).await {
+            Some(Prefix(p)) => p.make_clone().await,
+            None => None,
+        };
 
-        let content = msg.content.clone();
+        let prefix = match prefix_option {
+            Some(p) => p,
+            None => {
+                let DefaultPrefix(dp) = DefaultPrefix::extract_context(ctx)
+                    .await
+                    .unwrap_or(DefaultPrefix("!".to_string()));
+                dp
+            }
+        };
 
-        if !content.starts_with(&prefix) {
+        println!("Using prefix: {}", prefix);
+
+        if !msg.content.starts_with(&prefix) {
             return None;
         }
 
-        let content = content.trim_start_matches(&prefix);
-        let c_name = content
-            .split_whitespace()
-            .next()
-            .unwrap_or("")
-            .to_lowercase();
-
-        let content = content.trim_start_matches(&c_name).trim_start();
-        let command = self.0.read().await;
-        let command = command.get(&c_name)?;
-
+        let content: String = msg.content.clone();
+        let (mut command_name, content) = {
+            let content = content.trim_start_matches(&prefix);
+            let command_name = content
+                .split_whitespace()
+                .next()
+                .unwrap_or("")
+                .to_lowercase();
+            let content = content.trim_start_matches(&command_name).trim_start();
+            (command_name, content)
+        };
+        let guild_map = GuildMap::extract(ctx, &pre_action, parser).await?;
         let mut new_msg = msg.clone();
         new_msg.content = content.to_string();
+        let mut action = CommandAction::from(&new_msg);
 
-        let action = CommandAction::from(&new_msg);
+        if let Some(command_aliases) = (guild_map.read().await)
+            .get::<CommandAliases>()
+            .map(CommandAliases::from)
+            && let Some(alias) = command_aliases.get_cloned(&command_name).await
+        {
+            new_msg.content = alias.args_as_string();
+            action = CommandAction::from(&new_msg);
+            command_name = alias.command_name.clone();
+        }
 
-        if let Some(part_member) = &msg.member {
-            let members = Members::extract(ctx, &action, parser).await?;
-            let key = (guild_id, msg.author.id);
-            if !members.contains(key).await {
+        let command = self.0.read().await;
+        let command = command.get(&command_name)?;
+
+        if let Some(part_member) = &msg.member
+            && let Some(Members(members)) = Members::extract(ctx, &action, parser).await
+        {
+            let user_id = msg.author.id;
+            if !members.contains_key(&user_id) {
                 let mut member: Member = (*part_member.clone()).into();
                 member.user = msg.author.clone();
-                members.insert(key, member).await;
+                members.insert(user_id, Pointer::new(member)).await;
             }
         }
 
         let callbacks = &command.callbacks;
-        // if let Some(cooldown) = command.cooldown {}
+
+        if let Some(cooldown_num) = command.cooldown
+            && let Some(Data(shard_data)) = Data::extract(ctx, &action, parser).await
+            && let Some(Cooldowns(cooldowns)) = Cooldowns::retrieve(&shard_data)
+        {
+            let cooldown = Cooldown::Command(guild_id, msg.author.id, command_name.clone());
+            if (cooldowns.read().await).get(&cooldown).is_some() {
+                debug!(
+                    "Command '{}' is on cooldown for user {} in guild {}",
+                    command_name, msg.author.id, guild_id
+                );
+                return Some(command_name);
+            } else {
+                (cooldowns.write().await).insert(
+                    cooldown,
+                    Instant::now() + Duration::from_millis(cooldown_num),
+                );
+            }
+        }
+
         for callback in callbacks.iter() {
             let CommandCallbackType::Legacy(func) = callback else {
                 continue;
@@ -170,7 +217,7 @@ impl CommandExecution<Message> for CommandManager {
             let mut response_msg: CreateMessage = match (&response).try_into() {
                 Ok(m) => m,
                 Err(e) => {
-                    //This should send the error msg to the channel
+                    // This should send the error msg to the channel
                     error!("Failed to create message from command response: {}", e);
                     continue;
                 }
@@ -188,7 +235,9 @@ impl CommandExecution<Message> for CommandManager {
             tokio::spawn({
                 let http = ctx.http.clone();
                 let channel_id = possible_channel_id.unwrap_or(msg.channel_id);
-                let shard_data = shard_data.clone();
+                let ctx = ctx.clone();
+                let parser = parser.clone();
+                let action = action.clone();
                 async move {
                     let m = match http
                         .send_message(channel_id, attachments.clone(), &response_msg)
@@ -202,6 +251,7 @@ impl CommandExecution<Message> for CommandManager {
                     };
 
                     if response.is_ephemeral()
+                        && let Some(Data(shard_data)) = Data::extract(&ctx, &action, &parser).await
                         && let Some(Ephemerals(ephemerals)) = Ephemerals::retrieve(&shard_data)
                     {
                         let mut map = ephemerals.write().await;
@@ -210,7 +260,7 @@ impl CommandExecution<Message> for CommandManager {
                 }
             });
         }
-        Some(c_name)
+        Some(command_name)
     }
 }
 
@@ -222,7 +272,7 @@ impl CommandExecution<CommandInteraction> for CommandManager {
         interaction: &CommandInteraction,
         parser: &Pointer<Parser>,
     ) -> Option<String> {
-        let _guild_id = interaction.guild_id?;
+        interaction.guild_id?; // Ensure it's in a guild
 
         let c_name = interaction.data.name.to_lowercase();
         let action = CommandAction::from(interaction);
@@ -230,48 +280,46 @@ impl CommandExecution<CommandInteraction> for CommandManager {
         let command = self.0.read().await;
         let command = command.get(&c_name)?;
 
-        if let Some(member) = &interaction.member {
-            let members = Members::extract(ctx, &action, parser).await?;
-            let key = (member.guild_id, member.user.id);
-            if !members.contains(key).await {
+        if let Some(member) = &interaction.member
+            && let Some(Members(members)) = Members::extract_context_event(ctx, &action).await
+        {
+            let user_id = member.user.id;
+            if !members.contains_key(&user_id) {
                 let member = *member.clone();
-                members.insert(key, member).await;
+                members.insert(user_id, Pointer::new(member)).await;
             }
         }
 
         let callbacks = &command.callbacks;
         for callback in callbacks.iter() {
-            let CommandCallbackType::Slash(func) = callback else {
-                continue;
-            };
-            let Some(response) = func.call(ctx, &action, parser).await else {
-                continue;
-            };
-
-            let response_msg: CreateInteractionResponse = match (&response).try_into() {
-                Ok(m) => m,
-                Err(e) => {
-                    //This should send the error msg to the channel
-                    error!("Failed to create message from command response: {}", e);
-                    continue;
-                }
-            };
-
-            let attachments = response.get_attachments().clone();
-
-            tokio::spawn({
-                let http = ctx.http.clone();
-                let token = interaction.token.clone();
-                let id = interaction.id;
-                async move {
-                    if let Err(e) = http
-                        .create_interaction_response(id, &token, &response_msg, attachments)
-                        .await
-                    {
-                        error!("Failed to send command interaction response message: {}", e);
+            if let CommandCallbackType::Slash(func) = callback
+                && let Some(response) = func.call(ctx, &action, parser).await
+            {
+                let response_msg: CreateInteractionResponse = match (&response).try_into() {
+                    Ok(m) => m,
+                    Err(e) => {
+                        //This should send the error msg to the channel
+                        error!("Failed to create message from command response: {}", e);
+                        continue;
                     }
-                }
-            });
+                };
+
+                let attachments = response.get_attachments().clone();
+
+                tokio::spawn({
+                    let http = ctx.http.clone();
+                    let token = interaction.token.clone();
+                    let id = interaction.id;
+                    async move {
+                        if let Err(e) = http
+                            .create_interaction_response(id, &token, &response_msg, attachments)
+                            .await
+                        {
+                            error!("Failed to send command interaction response message: {}", e);
+                        }
+                    }
+                });
+            }
         }
         Some(c_name)
     }

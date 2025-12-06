@@ -69,6 +69,8 @@ pub enum DiscordEvent {
     EntitlementDelete,
     MessagePollVoteAdd,
     MessagePollVoteRemove,
+
+    Command,
     Unknown,
 }
 

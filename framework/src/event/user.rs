@@ -1,9 +1,9 @@
 use serenity::all::{Context, CurrentUser};
 
-use crate::extractors::CurrentBot;
+use crate::ShardData;
 
 pub async fn update_bot(ctx: &Context, user: &CurrentUser) {
-    if !(CurrentBot::is_set(&ctx.data).await) {
-        CurrentBot::set(&ctx.data, user.clone().into()).await;
+    if let Some(shard_data) = ShardData::get(ctx).await {
+        shard_data.bot.set(Some(user.clone().into())).await;
     }
 }

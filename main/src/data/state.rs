@@ -5,10 +5,10 @@ use serenity::{all::GuildId, prelude::TypeMapKey};
 use utils::{DataType, Pointer};
 
 #[derive(Clone, Default, DataExtractable, DataExtract)]
-pub struct LogConfigs(Pointer<HashMap<GuildId, DataType>>);
+pub struct States(Pointer<HashMap<GuildId, DataType>>);
 
-impl TypeMapKey for LogConfigs {
+impl TypeMapKey for States {
     type Value = Pointer<HashMap<GuildId, DataType>>;
 }
 
-impl LogConfigs {}
+impl States {}

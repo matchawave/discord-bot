@@ -5,7 +5,7 @@ macro_rules! create_log_struct {
         $(
             #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
             pub struct $name {
-                $(pub $field: (bool, Option<serenity::all::ChannelId>)),*
+                $(pub $field: Option<serenity::all::ChannelId>),*
             }
 
             impl serenity::prelude::TypeMapKey for $name {
@@ -48,8 +48,18 @@ macro_rules! populate_config {
     };
 }
 
+macro_rules! populate_data {
+    ($log_config:expr, $data_write:expr, [$(($log_type:ty, $field_name:ident)),* $(,)?]) => {
+        $(
+            if let Some(log_value) = &$log_config.$field_name {
+                $data_write.insert::<$log_type>(utils::Pointer::new(log_value.clone()));
+            }
+        )*
+    };
+}
+
 impl LogConfig {
-    async fn from_data(data: &DataType) -> Self {
+    pub async fn from_data(data: &DataType) -> Self {
         let data_read = data.read().await;
         let mut log_config = LogConfig::default();
 
@@ -69,5 +79,23 @@ impl LogConfig {
         );
 
         log_config
+    }
+
+    pub async fn to_data(&self, data: &DataType) {
+        let mut data_write = data.write().await;
+        populate_data!(
+            self,
+            data_write,
+            [
+                (MessageLog, message),
+                (VoiceLog, voice),
+                (ModerationLog, moderation),
+                (MemberLog, member),
+                (ChannelLog, channel),
+                (RoleLog, role),
+                (EmojiLog, emoji),
+                (GuildLog, guild),
+            ]
+        );
     }
 }

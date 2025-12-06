@@ -1,5 +1,3 @@
-use std::mem;
-
 use framework::{
     command::{CommandCallbackType, CommandResult, ICommand},
     extractors::InteractionOptions,
@@ -12,7 +10,7 @@ use utils::{BotPermission, Http, error};
 
 use crate::{cache::snipe::Snipes, no_snipes};
 
-use super::{super::super::author_embed, interaction_index, legacy_index, no_snipe_embed};
+use super::{super::super::author_embed, interaction_index, legacy_index};
 
 const NAME: &str = "snipe";
 const DESCRIPTION: &str = "Snipe the last deleted messages in a channel";
@@ -36,7 +34,7 @@ pub fn command() -> ICommand {
 
 async fn interaction(
     http: Http,
-    guild_id: GuildId,
+    _guild_id: GuildId,
     channel_id: ChannelId,
     snipes: Snipes,
     options: InteractionOptions,
@@ -44,7 +42,7 @@ async fn interaction(
 ) -> CommandResult<CreateEmbed> {
     let index = interaction_index(options);
 
-    match execute(http, guild_id, channel_id, snipes, member, index).await {
+    match execute(http, channel_id, snipes, member, index).await {
         Ok(embed) => Ok(embed),
         Err(e) => Err(e),
     }
@@ -52,7 +50,7 @@ async fn interaction(
 
 async fn legacy(
     http: Http,
-    guild_id: GuildId,
+    _guild_id: GuildId,
     channel_id: ChannelId,
     snipes: Snipes,
     options: Vec<String>,
@@ -60,7 +58,7 @@ async fn legacy(
 ) -> CommandResult<CreateEmbed> {
     let index = legacy_index(options)?;
 
-    match execute(http, guild_id, channel_id, snipes, member, index).await {
+    match execute(http, channel_id, snipes, member, index).await {
         Ok(embed) => Ok(embed),
         Err(e) => Err(e),
     }
@@ -68,13 +66,12 @@ async fn legacy(
 
 async fn execute(
     http: Http,
-    guild_id: GuildId,
     channel_id: ChannelId,
     snipes: Snipes,
     member: Member,
     index: i64,
 ) -> CommandResult<CreateEmbed> {
-    let Some(snipes) = snipes.get((guild_id, channel_id)).await else {
+    let Some(snipes) = snipes.0.get(&channel_id).await else {
         return Ok(Some(no_snipes!(
             Colour::BLITZ_BLUE,
             "{}: No **deleted messages** found in the past **2 hours**",

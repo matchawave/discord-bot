@@ -1,5 +1,4 @@
 use framework::{command::ICommand, extractors::InteractionOptions};
-use serenity::all::{Colour, CreateEmbed};
 use utils::{IntegerOption, ResponseError};
 mod edit;
 mod reaction;
@@ -9,9 +8,6 @@ pub fn register() -> Vec<ICommand> {
     vec![snipe::command(), edit::command(), reaction::command()]
 }
 
-pub fn no_snipe_embed<T: Into<String>>(text: T, c: Colour) -> CreateEmbed {
-    CreateEmbed::default().description(text.into()).colour(c)
-}
 pub fn legacy_index(options: Vec<String>) -> Result<i64, ResponseError> {
     match options.first() {
         Some(s) => match s.parse::<IntegerOption>() {

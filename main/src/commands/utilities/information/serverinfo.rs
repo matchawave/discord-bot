@@ -1,17 +1,16 @@
 use std::{collections::HashMap, sync::Arc};
 
 use framework::{
-    cache::{Channels, HTTPGetter},
     command::{CommandCallbackType, CommandResult, ICommand},
+    guilds::Channels,
 };
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serenity::all::{
     ChannelId, Colour, CreateEmbed, FormattedTimestamp, FormattedTimestampStyle, GuildChannel,
-    Mentionable, PartialGuild, PremiumTier, ShardId, ShardManager, UserId, VerificationLevel,
+    Mentionable, PartialGuild, PremiumTier, ShardId, ShardManager, VerificationLevel,
 };
-use utils::{Http, MemberData, Pointer};
 
-use crate::data::member::MembersInfo;
+use crate::data::member_list::MemberList;
 
 const NAME: &str = "serverinfo";
 const DESCRIPTION: &str = "Get information about the server";
@@ -26,36 +25,33 @@ pub fn command() -> ICommand {
 async fn interaction(
     shard_manager: Arc<ShardManager>,
     shard_id: ShardId,
-    http: Http,
     guild: PartialGuild,
     channels: Channels,
-    members_list: MembersInfo,
+    members_list: Option<MemberList>,
 ) -> CommandResult<CreateEmbed> {
     Ok(Some(
-        execute(shard_manager, shard_id, http, guild, channels, members_list).await,
+        execute(shard_manager, shard_id, guild, channels, members_list).await,
     ))
 }
 
 async fn legacy(
     shard_manager: Arc<ShardManager>,
     shard_id: ShardId,
-    http: Http,
     guild: PartialGuild,
     channels: Channels,
-    members_list: MembersInfo,
+    members_list: Option<MemberList>,
 ) -> CommandResult<CreateEmbed> {
     Ok(Some(
-        execute(shard_manager, shard_id, http, guild, channels, members_list).await,
+        execute(shard_manager, shard_id, guild, channels, members_list).await,
     ))
 }
 
 async fn execute(
     shard_manager: Arc<ShardManager>,
     shard_id: ShardId,
-    http: Http,
     guild: PartialGuild,
     channels: Channels,
-    members_list: MembersInfo,
+    members_list: Option<MemberList>,
 ) -> CreateEmbed {
     let mut fields = vec![];
     fields.push((
@@ -63,7 +59,6 @@ async fn execute(
         guild.owner_id.mention().to_string(),
         true,
     ));
-    let members_list = members_list.get(&guild.id).await;
     if let Some(m_list) = members_list {
         let members = get_members(m_list).await;
         fields.push(("Members".to_string(), members, true));
@@ -72,8 +67,8 @@ async fn execute(
     if let Some(designs) = get_guild_designs(&guild) {
         fields.push(("Designs".to_string(), designs, true));
     }
-    if let Some(channels) = channels.fetch(&http, guild.id).await {
-        let channels = get_channels(channels.make_clone().await);
+    {
+        let channels = get_channels(channels.0.make_clone().await);
         let title = format!("Channels ({})", channels.0);
         fields.push((title, channels.1, true));
     }
@@ -117,8 +112,8 @@ async fn get_description(
     format!("{}\n{}", created_at, shard_info)
 }
 
-async fn get_members(members: Pointer<HashMap<UserId, MemberData>>) -> String {
-    let members = members.read().await;
+async fn get_members(members: MemberList) -> String {
+    let members = members.0.read().await;
     let total = members.len();
     let (humans, bots) = members
         .par_iter()

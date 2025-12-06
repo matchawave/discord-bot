@@ -21,7 +21,6 @@ pub fn create_event_handler(shard_count: usize) -> EventManager {
     event_manager.add_handler(DiscordEvent::MessageDelete, message::delete);
 
     event_manager.add_handler(DiscordEvent::GuildCreate, guild::create);
-    event_manager.add_handler(DiscordEvent::GuildCreate, guild::get_voices);
     event_manager.add_handler(DiscordEvent::GuildUpdate, guild::update);
     event_manager.add_handler(DiscordEvent::GuildDelete, guild::delete);
 
@@ -36,7 +35,6 @@ pub fn create_event_handler(shard_count: usize) -> EventManager {
     event_manager.add_handler(DiscordEvent::GuildMemberAdd, member::add_member);
     event_manager.add_handler(DiscordEvent::GuildMemberRemove, member::subtract_member);
     event_manager.add_handler(DiscordEvent::GuildCreate, member::get_members);
-    event_manager.add_handler(DiscordEvent::GuildDelete, member::remove_members);
 
     event_manager
 }

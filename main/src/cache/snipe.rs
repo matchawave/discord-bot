@@ -1,4 +1,7 @@
-use framework::{CacheExtract, CacheExtractable, Extractable, extractors::Extractor};
+use framework::{
+    CacheExtractable, Extractable,
+    extractors::{ContextEventExtractor, EventExtractor, Extractor},
+};
 use moka::future::Cache;
 use serenity::{
     all::{ChannelId, GuildId, Message, Reaction},
@@ -8,46 +11,44 @@ use serenity::{
 macro_rules! snipe_builder {
     ($($name:ident, $base:ty;)*) => {
         $(
-            #[derive(Clone, CacheExtract, CacheExtractable)]
+            #[derive(Clone,  CacheExtractable)]
             #[cache(live="2h", capacity=100000)]
-            pub struct $name(Cache<(GuildId, ChannelId), utils::Pointer<Vec<$base>>>);
+            pub struct $name(pub Cache<ChannelId, utils::Pointer<Vec<$base>>>);
 
             impl TypeMapKey for $name {
-                type Value = Cache<(GuildId, ChannelId), utils::Pointer<Vec<$base>>>;
+                type Value = Cache<ChannelId, utils::Pointer<Vec<$base>>>;
+            }
+            #[serenity::async_trait]
+            impl<T> ContextEventExtractor<T> for $name
+            where
+                T: Send + Sync + 'static,
+                GuildId: EventExtractor<T>,
+            {
+                async fn extract_context_event(
+                    ctx: &serenity::all::Context,
+                    ev: &T,
+                ) -> Option<Self> {
+                    let data = framework::ShardData::get(ctx).await?;
+                    let guild_id = GuildId::extract_event(ev).await?;
+                    let guild_data = data.guilds.map(guild_id).await?;
+                    (guild_data.read().await.get::<$name>())
+                        .cloned()
+                        .map($name)
+                }
             }
 
-            impl $name {
-                pub async fn get(&self, key: (GuildId, ChannelId)) -> Option<utils::Pointer<Vec<$base>>> {
-                    self.0.get(&key).await.map(|v| v.clone())
-                }
-
-                pub async fn get_cloned(&self, key: (GuildId, ChannelId)) -> Option<Vec<$base>> {
-                    let p = self.0.get(&key).await?;
-                    Some(p.make_clone().await)
-                }
-
-                pub async fn insert(&self, value: $base) {
-                    if let Some(guild_id) = value.guild_id {
-                        let entry = self.0.get(&(guild_id, value.channel_id)).await.unwrap_or_default();
-                        entry.write().await.push(value);
-                        let len = entry.read().await.len();
-                        if len > 10 {
-                            entry.write().await.remove(0);
-                        }
-                    }
-                }
-
-                pub async fn clear(&self, key: (GuildId, ChannelId)) {
-                    self.0.invalidate(&key).await;
-                }
-
-                pub async fn clear_guild(&self, guild_id: GuildId) {
-                    if let Err(e) = self.0.invalidate_entries_if(move |e, _i| {
-                        e.0 == guild_id
-                    }) {
-                        utils::error!("[Snipe] : Failed to clear guild snipes: {}", e);
-                        return;
-                    }
+            #[serenity::async_trait]
+            impl<T> Extractor<T> for $name
+            where
+                T: Send + Sync + 'static,
+                GuildId: EventExtractor<T>,
+            {
+                async fn extract(
+                    ctx: &serenity::all::Context,
+                    ev: &T,
+                    _: &utils::Pointer<utils::Parser>,
+                ) -> Option<Self> {
+                    Self::extract_context_event(ctx, ev).await
                 }
             }
         )*

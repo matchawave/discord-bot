@@ -6,23 +6,24 @@ use serenity::{
     prelude::TypeMap,
 };
 use tokio::sync::RwLock;
-use utils::{error, info};
+use utils::info;
 
-use crate::{
-    Extractable,
-    data::{Cooldowns, Ephemerals},
-};
+use crate::data::{Cooldowns, Ephemerals};
 
 #[macro_export]
 macro_rules! build_process {
     ($name:ident, $ty:ty) => {
         use $crate::{DataExtractable, Extractable};
 
-        #[derive(Clone, Default, DataExtractable)]
+        #[derive(Clone, Default)]
         pub struct $name(pub utils::Pointer<$ty>);
 
         impl serenity::prelude::TypeMapKey for $name {
             type Value = utils::Pointer<$ty>;
+        }
+
+        impl $name {
+            pub async fn
         }
     };
 }
@@ -44,16 +45,10 @@ impl ProcessManager {
     }
     pub async fn init_loop(&self) {
         for shard in 0..self.shards {
-            let shard = ShardId(shard as u32);
-            let Some(data) = crate::data::Data::get(&self.datas, shard).await else {
-                error!("(processes) Failed to get data for shard {}", shard);
-                continue;
-            };
-
-            let data = data.clone();
             let http = self.http.clone();
+            let shard = ShardId(shard as u32);
+            let data = self.datas.clone();
             let processes = Arc::new(self.processes.clone());
-
             tokio::spawn(Self::process_loop(shard, data, http, processes));
         }
     }
@@ -67,22 +62,25 @@ impl ProcessManager {
 
     async fn process_loop(
         shard: ShardId,
-        data: Arc<TypeMap>,
+        data: Arc<RwLock<TypeMap>>,
         http: Arc<Http>,
         processes: Arc<Vec<Arc<dyn ProcessLoop + Send + Sync>>>,
     ) {
         info!("(processes) Starting process loop for shard {}", shard);
         loop {
-            if let Some(cooldowns) = Cooldowns::retrieve(&data) {
-                cooldowns.process(http.clone()).await;
-            }
+            {
+                let data_read = data.read().await;
+                if let Some(cooldowns) = data_read.get::<Cooldowns>().cloned().map(Cooldowns) {
+                    cooldowns.process(shard, http.clone()).await;
+                }
 
-            if let Some(ephemerals) = Ephemerals::retrieve(&data) {
-                ephemerals.process(http.clone()).await;
+                if let Some(ephemerals) = data_read.get::<Ephemerals>().cloned().map(Ephemerals) {
+                    ephemerals.process(shard, http.clone()).await;
+                }
             }
 
             for p in processes.iter() {
-                p.process(http.clone()).await;
+                p.process(shard, http.clone()).await;
             }
         }
     }
@@ -90,5 +88,5 @@ impl ProcessManager {
 
 #[async_trait]
 pub trait ProcessLoop {
-    async fn process(&self, http: utils::Http);
+    async fn process(&self, shard_id: ShardId, http: utils::Http);
 }

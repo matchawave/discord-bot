@@ -4,5 +4,5 @@ use serenity::prelude::TypeMap;
 use crate::configs::VoiceConfig;
 
 pub fn set_global(data: &mut TypeMap) {
-    UserConfigHash::<VoiceConfig>::init(data);
+    // UserConfigHash::<VoiceConfig>::init(data);
 }

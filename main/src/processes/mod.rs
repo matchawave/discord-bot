@@ -1,6 +1,8 @@
 use framework::processes::ProcessManager;
 use serenity::Client;
 
+mod socials;
+
 pub async fn start_background_processes(client: &Client, shards: usize) {
     let mut manager = ProcessManager::new(client.data.clone(), client.http.clone(), shards);
     // manager.register_process(process);

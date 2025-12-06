@@ -1,4 +1,3 @@
-mod aliases;
 mod bot;
 mod command_options;
 mod event;
@@ -8,7 +7,6 @@ mod interaction;
 mod parser;
 mod shard_manager;
 
-pub use aliases::*;
 pub use bot::*;
 pub use command_options::*;
 pub use shard_manager::*;
@@ -32,6 +30,21 @@ where
     async fn extract(ctx: &Context, ev: &T, p: &Pointer<Parser>) -> Option<Self> {
         Some(U::extract(ctx, ev, p).await)
     }
+}
+
+#[async_trait]
+pub trait EventExtractor<T>: Sized + Send + Sync + 'static {
+    async fn extract_event(ev: &T) -> Option<Self>;
+}
+
+#[async_trait]
+pub trait ContextExtractor: Sized + Send + Sync + 'static {
+    async fn extract_context(ctx: &Context) -> Option<Self>;
+}
+
+#[async_trait]
+pub trait ContextEventExtractor<T>: Sized + Send + Sync + 'static {
+    async fn extract_context_event(ctx: &Context, ev: &T) -> Option<Self>;
 }
 
 #[async_trait]

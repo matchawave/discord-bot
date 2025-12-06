@@ -15,9 +15,7 @@ pub struct VoiceConfig {
 
 impl VoiceConfig {
     pub fn permissions(&self, guild_id: GuildId) -> Option<[PermissionOverwrite; 2]> {
-        let Some(user_id) = self.locked else {
-            return None;
-        };
+        let user_id = self.locked?;
 
         let whitelist = PermissionOverwrite {
             allow: Permissions::CONNECT,

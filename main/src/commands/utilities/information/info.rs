@@ -1,7 +1,7 @@
 use framework::{
-    cache::{HTTPGetter, Members},
     command::{CommandCallbackType, CommandResult, ICommand},
     extractors::InteractionOptions,
+    guilds::{HTTPGetter, Members},
 };
 use rayon::{
     iter::{IntoParallelRefIterator, ParallelIterator},
@@ -74,7 +74,7 @@ async fn execute(
     guild: PartialGuild,
 ) -> CreateEmbed {
     if target.user.accent_colour.is_none()
-        && let Some(member) = members.get((guild.id, target.user.id)).await
+        && let Some(member) = members.0.get(&target.user.id).await
         && let Ok(fetched) = http.get_user(target.user.id).await
     {
         member.write().await.user = fetched;

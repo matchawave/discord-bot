@@ -8,7 +8,7 @@ use std::collections::HashMap;
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct VoiceMasterConfig {
     #[serde_as(as = "Vec<(_, _)>")]
-    masters: HashMap<ChannelId, Option<ChannelId>>,
+    masters: HashMap<ChannelId, (Option<ChannelId>, Option<u64>)>,
     #[serde(skip)] // Active channels are not serialized, they are runtime only
     actives: HashMap<ChannelId, UserId>,
     #[serde_as(as = "Vec<(_, _)>")]
@@ -17,7 +17,7 @@ pub struct VoiceMasterConfig {
 
 impl VoiceMasterConfig {
     pub fn new(
-        masters: HashMap<ChannelId, Option<ChannelId>>,
+        masters: HashMap<ChannelId, (Option<ChannelId>, Option<u64>)>,
         config: HashMap<ChannelId, VoiceConfig>,
     ) -> Self {
         Self {
@@ -28,11 +28,8 @@ impl VoiceMasterConfig {
     }
 
     /// Returns the parent id of the master channel if it exists
-    pub fn is_master(&self, channel: ChannelId) -> Option<Option<ChannelId>> {
-        match self.masters.get(&channel) {
-            Some(parent) => Some(*parent),
-            None => None,
-        }
+    pub fn is_master(&self, channel: ChannelId) -> Option<(Option<ChannelId>, Option<u64>)> {
+        self.masters.get(&channel).copied()
     }
 
     /// Insert a voice channel that was created by a user

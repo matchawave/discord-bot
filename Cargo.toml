@@ -5,13 +5,14 @@
 [profile.dev]
 opt-level = 0
 debug = true
+debug-assertions = true
 incremental = true
 codegen-units = 256
 
 [profile.release]
 opt-level = 3
 codegen-units = 1
-strip = "symbols"
+strip = true
 panic = "abort"
 lto = "fat"
 debug = false

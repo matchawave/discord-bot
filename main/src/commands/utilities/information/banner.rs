@@ -1,7 +1,7 @@
 use framework::{
-    cache::{HTTPGetter, Members},
     command::{CommandCallbackType, CommandResult, ICommand},
     extractors::InteractionOptions,
+    guilds::{HTTPGetter, Members},
 };
 use serenity::all::{
     Colour, CommandOptionType, CreateCommandOption, CreateEmbed, CreateEmbedAuthor, GuildId,
@@ -43,7 +43,7 @@ async fn interaction(
     };
 
     if target.user.accent_colour.is_none()
-        && let Some(member) = members.get((guild_id, target.user.id)).await
+        && let Some(member) = members.0.get(&target.user.id).await
         && let Ok(fetched) = http.get_user(target.user.id).await
     {
         member.write().await.user = fetched;
@@ -73,7 +73,7 @@ async fn legacy(
     };
 
     if target.user.accent_colour.is_none()
-        && let Some(member) = members.get((guild_id, target.user.id)).await
+        && let Some(member) = members.0.get(&target.user.id).await
         && let Ok(fetched) = http.get_user(target.user.id).await
     {
         member.write().await.user = fetched;
@@ -92,8 +92,8 @@ fn create_embed(target: Member, author: CreateEmbedAuthor) -> CreateEmbed {
     let banner = target.user.banner_url().unwrap_or(format!(
         "https://singlecolorimage.com/get/{}/{}x{}",
         color.hex(),
-        1100,
-        440
+        680,
+        240
     ));
     CreateEmbed::default()
         .title(format!("Avatar of {}", target.user.tag()))

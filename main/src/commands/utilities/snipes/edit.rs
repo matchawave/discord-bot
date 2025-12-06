@@ -1,7 +1,7 @@
 use framework::{
-    cache::{HTTPGetter, Messages},
     command::{CommandCallbackType, CommandResult, ICommand},
     extractors::InteractionOptions,
+    guilds::{HTTPGetter, Messages},
 };
 use serenity::all::{
     ChannelId, Colour, CommandOptionType, CreateAllowedMentions, CreateCommandOption, CreateEmbed,
@@ -11,7 +11,7 @@ use utils::{BotPermission, Http, error};
 
 use crate::{cache::snipe::EditSnipes, no_snipes};
 
-use super::{super::super::author_embed, interaction_index, legacy_index, no_snipe_embed};
+use super::{super::super::author_embed, interaction_index, legacy_index};
 
 const NAME: &str = "editsnipe";
 const DESCRIPTION: &str = "Snipe the last editted messages in a channel";
@@ -35,7 +35,7 @@ pub fn command() -> ICommand {
 
 async fn interaction(
     http: Http,
-    guild_id: GuildId,
+    _guild_id: GuildId,
     channel_id: ChannelId,
     snipes: EditSnipes,
     options: InteractionOptions,
@@ -44,7 +44,7 @@ async fn interaction(
 ) -> CommandResult<CreateEmbed> {
     let index = interaction_index(options);
 
-    match execute(http, guild_id, channel_id, snipes, messages, member, index).await {
+    match execute(http, channel_id, snipes, messages, member, index).await {
         Ok(embed) => Ok(embed),
         Err(e) => Err(e),
     }
@@ -52,7 +52,7 @@ async fn interaction(
 
 async fn legacy(
     http: Http,
-    guild_id: GuildId,
+    _guild_id: GuildId,
     channel_id: ChannelId,
     snipes: EditSnipes,
     options: Vec<String>,
@@ -61,7 +61,7 @@ async fn legacy(
 ) -> CommandResult<CreateEmbed> {
     let index = legacy_index(options)?;
 
-    match execute(http, guild_id, channel_id, snipes, messages, member, index).await {
+    match execute(http, channel_id, snipes, messages, member, index).await {
         Ok(embed) => Ok(embed),
         Err(e) => Err(e),
     }
@@ -69,14 +69,13 @@ async fn legacy(
 
 async fn execute(
     http: Http,
-    guild_id: GuildId,
     channel_id: ChannelId,
     snipes_repo: EditSnipes,
     messages: Messages,
     member: Member,
     index: i64,
 ) -> CommandResult<CreateEmbed> {
-    let Some(snipes) = snipes_repo.get((guild_id, channel_id)).await else {
+    let Some(snipes) = snipes_repo.0.get(&channel_id).await else {
         return Ok(Some(no_snipes!(
             Colour::BLITZ_BLUE,
             "{}: No **edited messages** found in the past **2 hours**",
@@ -104,7 +103,7 @@ async fn execute(
         .await
         .is_none()
     {
-        if let Some(snipes) = snipes_repo.get((guild_id, channel_id)).await {
+        if let Some(snipes) = snipes_repo.0.get(&channel_id).await {
             snipes.write().await.remove(index as usize);
         }
         return Ok(Some(no_snipes!(

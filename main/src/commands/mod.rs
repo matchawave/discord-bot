@@ -1,6 +1,6 @@
 use framework::{
-    cache::{HTTPGetter, Members},
     command::CommandManager,
+    guilds::{HTTPGetter, Members},
 };
 use serenity::all::{CreateEmbedAuthor, Member, User, UserId};
 use utils::Http;

@@ -12,10 +12,12 @@ const DESCRIPTION: &str = "Check the bot's latency";
 
 pub fn command() -> ICommand {
     // let options = CreateCommandOption::new(CommandOptionType::String, "", "");
-    ICommand::new(NAME, DESCRIPTION).callbacks(vec![
-        CommandCallbackType::slash(interaction),
-        CommandCallbackType::legacy(legacy),
-    ])
+    ICommand::new(NAME, DESCRIPTION)
+        .cooldown(3000)
+        .callbacks(vec![
+            CommandCallbackType::slash(interaction),
+            CommandCallbackType::legacy(legacy),
+        ])
 }
 
 const PING_RESPONSE_TEMPLATE: &str = "Pong! It took {time} to ping.";

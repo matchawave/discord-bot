@@ -3,6 +3,10 @@ name = "main"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "matchawave"
+path = "src/main.rs"
+
 [build-dependencies]
 dotenv = "0.15"
 

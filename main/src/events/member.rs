@@ -4,9 +4,9 @@ use serenity::{
 };
 use utils::{Http, error, info};
 
-use crate::data::member::MembersInfo;
+use crate::data::member_list::MemberList;
 
-pub async fn get_members(guild_id: GuildId, members_list: MembersInfo, http: Http) {
+pub async fn get_members(guild_id: GuildId, members_list: MemberList, http: Http) {
     tokio::spawn(async move {
         let mut members = guild_id.members_iter(http).boxed();
         info!("Fetching members for guild {}...", guild_id);
@@ -14,7 +14,7 @@ pub async fn get_members(guild_id: GuildId, members_list: MembersInfo, http: Htt
         while let Some(member_res) = members.next().await {
             match member_res {
                 Ok(member) => {
-                    members_list.add(&member).await;
+                    members_list.insert(&member).await;
                     total += 1;
                 }
                 Err(err) => {
@@ -26,14 +26,10 @@ pub async fn get_members(guild_id: GuildId, members_list: MembersInfo, http: Htt
     });
 }
 
-pub async fn remove_members(guild_id: GuildId, members_list: MembersInfo) {
-    members_list.remove(&guild_id).await;
+pub async fn add_member(member: Member, members_list: MemberList) {
+    members_list.insert(&member).await;
 }
 
-pub async fn add_member(member: Member, members_list: MembersInfo) {
-    members_list.add(&member).await;
-}
-
-pub async fn subtract_member(member: Member, members_list: MembersInfo) {
-    members_list.subtract(&member).await;
+pub async fn subtract_member(member: Member, members_list: MemberList) {
+    members_list.remove(member.user.id).await;
 }

@@ -1,15 +1,15 @@
 use framework::{
-    cache::{HTTPGetter, Members, Messages},
     command::{CommandCallbackType, CommandResult, ICommand},
     extractors::InteractionOptions,
+    guilds::{HTTPGetter, Members, Messages},
 };
 use serenity::all::{
     ChannelId, Colour, CommandOptionType, CreateAllowedMentions, CreateCommandOption, CreateEmbed,
-    CreateMessage, GuildId, Member, Mentionable, Reaction, ReactionType,
+    CreateMessage, GuildId, Member, Mentionable,
 };
 use utils::{BotPermission, Http, error};
 
-use super::{super::super::author_embed, interaction_index, legacy_index, no_snipe_embed};
+use super::{super::super::author_embed, interaction_index, legacy_index};
 use crate::{cache::snipe::ReactionSnipes, no_snipes};
 
 const NAME: &str = "reactsnipe";
@@ -84,7 +84,7 @@ async fn execute(
     messages: Messages,
     index: i64,
 ) -> CommandResult<CreateEmbed> {
-    let Some(snipes) = snipes.get((guild_id, channel_id)).await else {
+    let Some(snipes) = snipes.0.get(&channel_id).await else {
         return Ok(Some(no_snipes!(
             Colour::BLITZ_BLUE,
             "{}: No **removed reactions** found in the past **2 hours**",
@@ -99,7 +99,7 @@ async fn execute(
             None => {
                 return Ok(Some(no_snipes!(
                     Colour::BLITZ_BLUE,
-                    "{}: No **edited message** found at index `{}`",
+                    "{}: No **reaction** found at index `{}`",
                     member.user.id.mention().to_string(),
                     index,
                 )));

@@ -4,25 +4,21 @@ use serenity::{
 };
 use utils::{Parser, Pointer};
 
-use crate::{command::CommandAction, extractors::Extractor};
+use crate::{
+    command::CommandAction,
+    extractors::{ContextExtractor, EventExtractor, Extractor},
+};
 
 #[async_trait]
-impl Extractor<Event> for ShardId {
-    async fn extract(ctx: &Context, _ev: &Event, _p: &Pointer<Parser>) -> Option<Self> {
+impl ContextExtractor for ShardId {
+    async fn extract_context(ctx: &Context) -> Option<Self> {
         Some(ctx.shard_id)
     }
 }
 
 #[async_trait]
-impl Extractor<CommandAction> for ShardId {
-    async fn extract(ctx: &Context, _ev: &CommandAction, _p: &Pointer<Parser>) -> Option<Self> {
-        Some(ctx.shard_id)
-    }
-}
-
-#[async_trait]
-impl Extractor<Event> for GuildId {
-    async fn extract(_ctx: &Context, ev: &Event, _p: &Pointer<Parser>) -> Option<Self> {
+impl EventExtractor<Event> for GuildId {
+    async fn extract_event(ev: &Event) -> Option<Self> {
         match ev {
             Event::GuildCreate(env) => Some(env.guild.id),
             Event::GuildUpdate(env) => Some(env.guild.id),
@@ -87,8 +83,8 @@ impl Extractor<Event> for GuildId {
 }
 
 #[async_trait]
-impl Extractor<CommandAction> for GuildId {
-    async fn extract(_ctx: &Context, action: &CommandAction, _p: &Pointer<Parser>) -> Option<Self> {
+impl EventExtractor<CommandAction> for GuildId {
+    async fn extract_event(action: &CommandAction) -> Option<Self> {
         match action {
             CommandAction::Interaction(i) => i.guild_id,
             CommandAction::Message(m) => m.guild_id,
@@ -97,8 +93,8 @@ impl Extractor<CommandAction> for GuildId {
 }
 
 #[async_trait]
-impl Extractor<Event> for ChannelId {
-    async fn extract(_ctx: &Context, ev: &Event, _p: &Pointer<Parser>) -> Option<Self> {
+impl EventExtractor<Event> for ChannelId {
+    async fn extract_event(ev: &Event) -> Option<Self> {
         match ev {
             Event::MessageCreate(env) => Some(env.message.channel_id),
             Event::MessageUpdate(env) => Some(env.channel_id),
@@ -126,8 +122,8 @@ impl Extractor<Event> for ChannelId {
 }
 
 #[async_trait]
-impl Extractor<CommandAction> for ChannelId {
-    async fn extract(_ctx: &Context, ev: &CommandAction, _p: &Pointer<Parser>) -> Option<Self> {
+impl EventExtractor<CommandAction> for ChannelId {
+    async fn extract_event(ev: &CommandAction) -> Option<Self> {
         match ev {
             CommandAction::Message(m) => Some(m.channel_id),
             CommandAction::Interaction(i) => Some(i.channel_id),
@@ -136,8 +132,8 @@ impl Extractor<CommandAction> for ChannelId {
 }
 
 #[async_trait]
-impl Extractor<Event> for Vec<ChannelId> {
-    async fn extract(_ctx: &Context, ev: &Event, _p: &Pointer<Parser>) -> Option<Self> {
+impl EventExtractor<Event> for Vec<ChannelId> {
+    async fn extract_event(ev: &Event) -> Option<Self> {
         match ev {
             Event::ThreadListSync(env) => env.channel_ids.clone(),
             _ => None,
@@ -146,8 +142,8 @@ impl Extractor<Event> for Vec<ChannelId> {
 }
 
 #[async_trait]
-impl Extractor<Event> for MessageId {
-    async fn extract(_ctx: &Context, ev: &Event, _p: &Pointer<Parser>) -> Option<Self> {
+impl EventExtractor<Event> for MessageId {
+    async fn extract_event(ev: &Event) -> Option<Self> {
         match ev {
             Event::MessageCreate(env) => Some(env.message.id),
             Event::MessageUpdate(env) => Some(env.id),
@@ -163,8 +159,8 @@ impl Extractor<Event> for MessageId {
 }
 
 #[async_trait]
-impl Extractor<Event> for Vec<MessageId> {
-    async fn extract(_ctx: &Context, ev: &Event, _p: &Pointer<Parser>) -> Option<Self> {
+impl EventExtractor<Event> for Vec<MessageId> {
+    async fn extract_event(ev: &Event) -> Option<Self> {
         match ev {
             Event::MessageDeleteBulk(env) => Some(env.ids.clone()),
             _ => None,
@@ -173,8 +169,8 @@ impl Extractor<Event> for Vec<MessageId> {
 }
 
 #[async_trait]
-impl Extractor<CommandAction> for MessageId {
-    async fn extract(_ctx: &Context, action: &CommandAction, _p: &Pointer<Parser>) -> Option<Self> {
+impl EventExtractor<CommandAction> for MessageId {
+    async fn extract_event(action: &CommandAction) -> Option<Self> {
         match action {
             CommandAction::Message(m) => Some(m.id),
             _ => None,
@@ -183,8 +179,8 @@ impl Extractor<CommandAction> for MessageId {
 }
 
 #[async_trait]
-impl Extractor<Event> for UserId {
-    async fn extract(_ctx: &Context, ev: &Event, _p: &Pointer<Parser>) -> Option<Self> {
+impl EventExtractor<Event> for UserId {
+    async fn extract_event(ev: &Event) -> Option<Self> {
         match ev {
             Event::GuildMemberAdd(env) => Some(env.member.user.id),
             Event::GuildMemberRemove(env) => Some(env.user.id),
@@ -212,11 +208,84 @@ impl Extractor<Event> for UserId {
 }
 
 #[async_trait]
-impl Extractor<CommandAction> for UserId {
-    async fn extract(_ctx: &Context, action: &CommandAction, _p: &Pointer<Parser>) -> Option<Self> {
+impl EventExtractor<CommandAction> for UserId {
+    async fn extract_event(action: &CommandAction) -> Option<Self> {
         match action {
             CommandAction::Message(m) => Some(m.author.id),
             CommandAction::Interaction(i) => Some(i.user.id),
         }
+    }
+}
+
+#[async_trait]
+impl<T> Extractor<T> for ShardId {
+    async fn extract(ctx: &Context, _ev: &T, _p: &Pointer<Parser>) -> Option<Self> {
+        ShardId::extract_context(ctx).await
+    }
+}
+
+#[async_trait]
+impl<T> Extractor<T> for GuildId
+where
+    T: Send + Sync + 'static,
+    GuildId: EventExtractor<T>,
+{
+    async fn extract(_: &Context, ev: &T, _: &Pointer<Parser>) -> Option<Self> {
+        GuildId::extract_event(ev).await
+    }
+}
+
+#[async_trait]
+impl<T> Extractor<T> for ChannelId
+where
+    T: Send + Sync + 'static,
+    ChannelId: EventExtractor<T>,
+{
+    async fn extract(_: &Context, ev: &T, _: &Pointer<Parser>) -> Option<Self> {
+        ChannelId::extract_event(ev).await
+    }
+}
+
+#[async_trait]
+impl<T> Extractor<T> for Vec<ChannelId>
+where
+    T: Send + Sync + 'static,
+    Vec<ChannelId>: EventExtractor<T>,
+{
+    async fn extract(_: &Context, ev: &T, _: &Pointer<Parser>) -> Option<Self> {
+        Vec::<ChannelId>::extract_event(ev).await
+    }
+}
+
+#[async_trait]
+impl<T> Extractor<T> for MessageId
+where
+    T: Send + Sync + 'static,
+    MessageId: EventExtractor<T>,
+{
+    async fn extract(_: &Context, ev: &T, _: &Pointer<Parser>) -> Option<Self> {
+        MessageId::extract_event(ev).await
+    }
+}
+
+#[async_trait]
+impl<T> Extractor<T> for Vec<MessageId>
+where
+    T: Send + Sync + 'static,
+    Vec<MessageId>: EventExtractor<T>,
+{
+    async fn extract(_: &Context, ev: &T, _: &Pointer<Parser>) -> Option<Self> {
+        Vec::<MessageId>::extract_event(ev).await
+    }
+}
+
+#[async_trait]
+impl<T> Extractor<T> for UserId
+where
+    T: Send + Sync + 'static,
+    UserId: EventExtractor<T>,
+{
+    async fn extract(_: &Context, ev: &T, _: &Pointer<Parser>) -> Option<Self> {
+        UserId::extract_event(ev).await
     }
 }

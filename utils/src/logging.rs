@@ -1,9 +1,8 @@
 #[macro_export]
 macro_rules! info {
     ($($arg:tt)*) => ({
-        use chrono::{DateTime, Utc};
         use colored::Colorize;
-        let dt: DateTime<Utc> = Utc::now();
+        let dt = chrono::Utc::now();
 
         let formated_time_date: String = dt.format("%Y-%m-%d %H:%M:%S").to_string();
 
@@ -20,9 +19,8 @@ macro_rules! info {
 #[macro_export]
 macro_rules! error {
     ($($arg:tt)*) => ({
-        use chrono::{DateTime, Utc};
         use colored::Colorize;
-        let dt: DateTime<Utc> = Utc::now();
+        let dt = chrono::Utc::now();
 
         let formated_time_date: String = dt.format("%Y-%m-%d %H:%M:%S").to_string();
 
@@ -39,9 +37,8 @@ macro_rules! error {
 #[macro_export]
 macro_rules! warning {
     ($($arg:tt)*) => ({
-        use chrono::{DateTime, Utc};
         use colored::Colorize;
-        let dt: DateTime<Utc> = Utc::now();
+        let dt = chrono::Utc::now();
 
         let formated_time_date: String = dt.format("%Y-%m-%d %H:%M:%S").to_string();
 
@@ -58,19 +55,19 @@ macro_rules! warning {
 #[macro_export]
 macro_rules! debug {
     ($($arg:tt)*) => ({
-        use chrono::{DateTime, Utc};
-        use colored::Colorize;
-        let dt: DateTime<Utc> = Utc::now();
+        if cfg!(debug_assertions) {
+            use colored::Colorize;
+            let dt = chrono::Utc::now();
 
-        let formated_time_date: String = dt.format("%Y-%m-%d %H:%M:%S").to_string();
+            let formated_time_date: String = dt.format("%Y-%m-%d %H:%M:%S").to_string();
 
-        println!(
-            "{} [{}]: {}",
-            formated_time_date,
-            "DEBUG".green().bold(),
-            format!($($arg)*)
-        );
-
+            println!(
+                "{} [{}]: {}",
+                formated_time_date,
+                "DEBUG".green().bold(),
+                format!($($arg)*)
+            );
+        }
     });
 }
 

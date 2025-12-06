@@ -49,6 +49,12 @@ impl<T> Pointer<T> {
             .expect("Multiple pointers exist")
             .into_inner()
     }
+
+    pub async fn set(&self, value: T) -> Self {
+        let mut write = self.0.write().await;
+        *write = value;
+        self.clone()
+    }
 }
 
 impl<T: Clone> Pointer<T> {
