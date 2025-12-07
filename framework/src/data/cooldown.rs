@@ -69,29 +69,32 @@ where
 #[async_trait]
 impl ProcessLoop for Cooldowns {
     async fn process(&self, _http: Http) {
-        let now = std::time::Instant::now();
-        let map = self.0.read().await.clone();
-        for (key, &time) in map.iter() {
-            if now > time {
-                match (key.guild(), key.user()) {
-                    (Some(guild_id), Some(user_id)) => {
-                        info!(
-                            "(cooldowns) Expired cooldown for user {} in guild {} for identifier: {}",
-                            user_id,
-                            guild_id,
-                            key.identifier()
-                        );
+        loop {
+            let now = std::time::Instant::now();
+            let map = self.0.read().await.clone();
+            for (key, &time) in map.iter() {
+                if now > time {
+                    match (key.guild(), key.user()) {
+                        (Some(guild_id), Some(user_id)) => {
+                            info!(
+                                "(cooldowns) Expired cooldown for user {} in guild {} for identifier: {}",
+                                user_id,
+                                guild_id,
+                                key.identifier()
+                            );
+                        }
+                        _ => {
+                            info!(
+                                "(cooldowns) Expired cooldown for identifier: {}",
+                                key.identifier()
+                            );
+                        }
                     }
-                    _ => {
-                        info!(
-                            "(cooldowns) Expired cooldown for identifier: {}",
-                            key.identifier()
-                        );
-                    }
+                    let mut map = self.0.write().await;
+                    map.remove(key);
                 }
-                let mut map = self.0.write().await;
-                map.remove(key);
             }
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
         }
     }
 }

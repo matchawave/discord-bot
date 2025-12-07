@@ -11,6 +11,8 @@ dashmap = { workspace = true }
 colored = { workspace = true }
 fastrand = "2.3"
 rayon = { workspace = true }
+serde = { workspace = true }
+serde_with = { workspace = true }
 
 tokio = { workspace = true }
 tokio-tungstenite = { version = "0.28", default-features = false, features = [

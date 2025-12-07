@@ -48,10 +48,7 @@ impl ProcessManager {
             let process = p.clone();
             let http = self.http.clone();
             tokio::spawn(async move {
-                loop {
-                    process.process(http.clone()).await;
-                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-                }
+                process.process(http.clone()).await;
             });
         }
     }

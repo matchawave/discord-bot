@@ -1,7 +1,9 @@
+use std::fmt::{Display, Formatter};
+
 use serenity::all::Permissions;
 use strum_macros::Display;
 
-#[derive(Display, Debug, Clone)]
+#[derive(Display, Debug, Clone, Hash, Eq, PartialEq, Copy)]
 pub enum BotPermission {
     #[strum(serialize = "bot_master")]
     BotMaster,
@@ -35,6 +37,56 @@ pub enum BotPermission {
     ManageNicknames,
     #[strum(serialize = "mention_everyone")]
     MentionEveryone,
+}
+
+impl BotPermission {
+    pub fn list() -> Vec<BotPermission> {
+        vec![
+            BotPermission::BotMaster,
+            BotPermission::Administrator,
+            BotPermission::BanMembers,
+            BotPermission::KickMembers,
+            BotPermission::MuteMembers,
+            BotPermission::DeafenMembers,
+            BotPermission::MoveMembers,
+            BotPermission::ManageGuild,
+            BotPermission::ManageChannels,
+            BotPermission::ManageRoles,
+            BotPermission::ManageMessages,
+            BotPermission::ManageWebhooks,
+            BotPermission::ManageGuildExpressions,
+            BotPermission::ManageEvents,
+            BotPermission::ManageNicknames,
+            BotPermission::MentionEveryone,
+        ]
+    }
+
+    pub fn count() -> usize {
+        Self::list().len()
+    }
+}
+
+impl From<BotPermission> for Permissions {
+    fn from(perm: BotPermission) -> Self {
+        match perm {
+            BotPermission::BotMaster => Permissions::empty(),
+            BotPermission::Administrator => Permissions::ADMINISTRATOR,
+            BotPermission::BanMembers => Permissions::BAN_MEMBERS,
+            BotPermission::KickMembers => Permissions::KICK_MEMBERS,
+            BotPermission::MuteMembers => Permissions::MUTE_MEMBERS,
+            BotPermission::DeafenMembers => Permissions::DEAFEN_MEMBERS,
+            BotPermission::MoveMembers => Permissions::MOVE_MEMBERS,
+            BotPermission::ManageGuild => Permissions::MANAGE_GUILD,
+            BotPermission::ManageChannels => Permissions::MANAGE_CHANNELS,
+            BotPermission::ManageRoles => Permissions::MANAGE_ROLES,
+            BotPermission::ManageMessages => Permissions::MANAGE_MESSAGES,
+            BotPermission::ManageWebhooks => Permissions::MANAGE_WEBHOOKS,
+            BotPermission::ManageGuildExpressions => Permissions::MANAGE_GUILD_EXPRESSIONS,
+            BotPermission::ManageEvents => Permissions::MANAGE_EVENTS,
+            BotPermission::ManageNicknames => Permissions::MANAGE_NICKNAMES,
+            BotPermission::MentionEveryone => Permissions::MENTION_EVERYONE,
+        }
+    }
 }
 
 pub const PERMISSION_PRIORITY: [Permissions; 32] = [

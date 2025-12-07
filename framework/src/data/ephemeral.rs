@@ -35,30 +35,33 @@ impl Ephemeral {
 #[async_trait]
 impl ProcessLoop for Ephemerals {
     async fn process(&self, http: Http) {
-        let map = self.0.read().await.clone();
-        let now = std::time::Instant::now();
-        for (key, &time) in map.iter() {
-            if now > time {
-                info!(
-                    "(ephemerals) Deleting ephemeral message {} in channel {}",
-                    key.message_id, key.channel_id
-                );
-                if let Err(e) = http
-                    .delete_message(
-                        key.channel_id,
-                        key.message_id,
-                        Some("Ephemeral message cleanup"),
-                    )
-                    .await
-                {
-                    error!(
-                        "(ephemerals) Failed to delete ephemeral message {} in channel {}: {}",
-                        key.message_id, key.channel_id, e
+        loop {
+            let map = self.0.read().await.clone();
+            let now = std::time::Instant::now();
+            for (key, &time) in map.iter() {
+                if now > time {
+                    info!(
+                        "(ephemerals) Deleting ephemeral message {} in channel {}",
+                        key.message_id, key.channel_id
                     );
+                    if let Err(e) = http
+                        .delete_message(
+                            key.channel_id,
+                            key.message_id,
+                            Some("Ephemeral message cleanup"),
+                        )
+                        .await
+                    {
+                        error!(
+                            "(ephemerals) Failed to delete ephemeral message {} in channel {}: {}",
+                            key.message_id, key.channel_id, e
+                        );
+                    }
+                    let mut map = self.0.write().await;
+                    map.remove(key);
                 }
-                let mut map = self.0.write().await;
-                map.remove(key);
             }
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
         }
     }
 }

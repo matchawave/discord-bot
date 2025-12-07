@@ -1,7 +1,8 @@
-use serenity::all::{Colour, CreateActionRow, CreateEmbed};
-use utils::ResponseError;
+use serenity::all::{CreateActionRow, CreateEmbed};
 
-use crate::command::{CommandResult, functions::CallbackReturn, response::CommandResponse};
+use crate::command::{
+    CommandResult, create_error_embed, functions::CallbackReturn, response::CommandResponse,
+};
 
 impl CallbackReturn for () {
     fn into_response(self: Box<Self>) -> Option<CommandResponse> {
@@ -80,16 +81,4 @@ impl CallbackReturn for CommandResult<(Vec<CreateEmbed>, Vec<CreateActionRow>)> 
             Err(e) => Some(create_error_embed(e)),
         }
     }
-}
-
-fn create_error_embed(error: ResponseError) -> CommandResponse {
-    let mut embed = CreateEmbed::default();
-    embed = embed.description(error.to_string());
-    match error {
-        ResponseError::Err(_) => embed = embed.color(Colour::RED),
-        ResponseError::Warn(_) => embed = embed.color(Colour::GOLD),
-        ResponseError::Info(_) => embed = embed.color(Colour::BLITZ_BLUE),
-    };
-
-    CommandResponse::new_embeds(vec![embed]).ephemeral()
 }

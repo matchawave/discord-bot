@@ -1,22 +1,23 @@
 mod channels;
 mod members;
 mod messages;
+mod permissions;
 mod voice_state;
 
 pub use channels::{ChannelMembers, Channels};
 pub use members::Members;
 pub use messages::Messages;
-use moka::future::Cache;
+pub use permissions::*;
 pub use voice_state::VoiceStates;
 
-use std::{collections::HashMap, hash::Hash};
-
 use macros::DataExtractable;
+use moka::future::Cache;
 use serenity::{
     all::{Context, Event, Guild, GuildId, PartialGuild},
     async_trait,
     prelude::{TypeMap, TypeMapKey},
 };
+use std::{collections::HashMap, hash::Hash};
 use utils::{Http, Parser, Pointer, error};
 
 use crate::{
@@ -37,13 +38,14 @@ impl Guilds {
         let voice_states = VoiceStates::default();
         voice_states.from_voice_states(&guild.voice_states).await;
 
-        new_map.insert::<Channels>(Pointer::new(guild.channels.clone()));
+        new_map.insert::<Channels>(guild.channels.clone().into());
         new_map.insert::<Members>(Members::new(&guild.members).await.0);
         new_map.insert::<Messages>(Messages::default().0);
         new_map.insert::<VoiceStates>(voice_states.0);
         new_map.insert::<ChannelMembers>(ChannelMembers::new(&guild.voice_states).0);
         new_map.insert::<Pointer<PartialGuild>>(Pointer::new(guild.into()));
-        new_map.insert::<Prefix>(Pointer::new(None));
+        new_map.insert::<Prefix>(Pointer::default());
+        new_map.insert::<FakePerms>(Pointer::default());
 
         self.0.write().await.insert(guild_id, Pointer::new(new_map));
     }

@@ -4,6 +4,7 @@ mod functions;
 pub mod response;
 pub use builder::ICommand;
 pub use functions::{CommandAction, CommandCallbackType};
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use std::{
     collections::HashMap,
@@ -14,14 +15,14 @@ use std::{
 use serenity::{
     Client,
     all::{
-        CommandInteraction, Context, CreateCommand, CreateInteractionResponse, CreateMessage,
-        GuildId, Member, Message,
+        Colour, CommandInteraction, Context, CreateCommand, CreateEmbed, CreateInteractionResponse,
+        CreateMessage, GuildId, Member, Message,
     },
     async_trait,
     prelude::TypeMap,
 };
 use tokio::sync::RwLock;
-use utils::{ElapsedTime, Parser, Pointer, ResponseError, debug, error, info};
+use utils::{ElapsedTime, Http, Parser, Pointer, ResponseError, debug, error, info};
 
 use crate::{
     Extractable, ShardData,
@@ -31,7 +32,7 @@ use crate::{
     },
     extractors::{ContextEventExtractor, ContextExtractor, Extractor},
     global::Commands,
-    guilds::{GuildMap, Members},
+    guilds::{FakePerms, GuildMap, HTTPGetter, Members},
     processes::ProcessManager,
 };
 
@@ -175,22 +176,41 @@ impl CommandExecution<Message> for CommandManager {
         let command = self.0.read().await;
         let command = command.get(&command_name)?;
 
-        if let Some(part_member) = &msg.member
-            && let Some(Members(members)) = Members::extract(ctx, &action, parser).await
-        {
-            let user_id = msg.author.id;
-            if !members.contains_key(&user_id) {
-                let mut member: Member = (*part_member.clone()).into();
-                member.user = msg.author.clone();
-                members.insert(user_id, Pointer::new(member)).await;
-            }
-        }
-
         let callbacks = &command.callbacks;
         let Some(p_manager) = Arc::<ProcessManager>::extract_context(ctx).await else {
             error!("Failed to extract ProcessManager from context");
             return None;
         };
+
+        let Some(member) = (match Members::extract(ctx, &action, parser).await {
+            Some(members) => members.fetch(&ctx.http, (guild_id, msg.author.id)).await,
+            None => None,
+        }) else {
+            error!(
+                "Failed to extract Member {} in guild {} for command '{}'",
+                msg.author.id, guild_id, command_name
+            );
+            return None;
+        };
+
+        if let Some(fake_perms) = FakePerms::extract_context_event(ctx, &action).await
+            && let Some(missing_perms) = fake_perms
+                .member_lacks_permission(&member, &command.permissions)
+                .await
+        {
+            let missing_perms_str = missing_perms
+                .par_iter()
+                .map(|p| format!("`{}`", p))
+                .collect::<Vec<String>>()
+                .join(", ");
+            let response = create_error_embed(ResponseError::Warn(format!(
+                "You lack the following permissions to run this command: \n{}",
+                missing_perms_str
+            )));
+
+            send_message(&ctx.http, &p_manager, &response, msg);
+            return None;
+        }
 
         if let Some(cooldown_num) = command.cooldown
             && let Some(cooldowns) = p_manager.get::<Cooldowns>()
@@ -214,48 +234,7 @@ impl CommandExecution<Message> for CommandManager {
             if let CommandCallbackType::Legacy(func) = callback
                 && let Some(response) = func.call(ctx, &action, parser).await
             {
-                let mut response_msg: CreateMessage = match (&response).try_into() {
-                    Ok(m) => m,
-                    Err(e) => {
-                        // This should send the error msg to the channel
-                        error!("Failed to create message from command response: {}", e);
-                        continue;
-                    }
-                };
-
-                let attachments = response.get_attachments().clone();
-
-                if response.should_reply() {
-                    response_msg = response_msg.reference_message(msg);
-                    response_msg = response_msg.allowed_mentions((&response).into()); // Set allowed mentions based on response
-                }
-
-                let possible_channel_id = response.get_channel();
-
-                tokio::spawn({
-                    let channel_id = possible_channel_id.unwrap_or(msg.channel_id);
-                    let http = ctx.http.clone();
-                    let p_manager = p_manager.clone();
-                    async move {
-                        let m = match http
-                            .send_message(channel_id, attachments.clone(), &response_msg)
-                            .await
-                        {
-                            Ok(m) => m,
-                            Err(e) => {
-                                error!("Failed to send command response message: {}", e);
-                                return;
-                            }
-                        };
-
-                        if response.is_ephemeral()
-                            && let Some(ephemerals) = p_manager.get::<Ephemerals>()
-                        {
-                            let mut map = ephemerals.0.write().await;
-                            map.insert(Ephemeral::new(&m), Instant::now() + Duration::from_secs(3));
-                        }
-                    }
-                });
+                send_message(&ctx.http, &p_manager, &response, msg);
             };
         }
         Some(command_name)
@@ -321,4 +300,62 @@ impl CommandExecution<CommandInteraction> for CommandManager {
         }
         Some(c_name)
     }
+}
+
+pub(super) fn send_message(
+    http: &Http,
+    p_manager: &Arc<ProcessManager>,
+    response: &CommandResponse,
+    ref_msg: &Message,
+) {
+    let channel_id = response.get_channel().unwrap_or(ref_msg.channel_id);
+    let mut response_msg: CreateMessage = match response.try_into() {
+        Ok(m) => m,
+        Err(e) => {
+            // This should send the error msg to the channel
+            error!("Failed to create message from command response: {}", e);
+            return;
+        }
+    };
+
+    let attachments = response.get_attachments().clone();
+
+    if response.should_reply() {
+        response_msg = response_msg.reference_message(ref_msg);
+        response_msg = response_msg.allowed_mentions(response.into()); // Set allowed mentions based on response
+    }
+    let is_ephemeral = response.is_ephemeral();
+    let http = http.clone();
+    let p_manager = p_manager.clone();
+    tokio::spawn({
+        async move {
+            let m = match http
+                .send_message(channel_id, attachments.clone(), &response_msg)
+                .await
+            {
+                Ok(m) => m,
+                Err(e) => {
+                    error!("Failed to send command response message: {}", e);
+                    return;
+                }
+            };
+
+            if is_ephemeral && let Some(ephemerals) = p_manager.get::<Ephemerals>() {
+                let mut map = ephemerals.0.write().await;
+                map.insert(Ephemeral::new(&m), Instant::now() + Duration::from_secs(3));
+            }
+        }
+    });
+}
+
+pub(super) fn create_error_embed(error: ResponseError) -> CommandResponse {
+    let mut embed = CreateEmbed::default();
+    embed = embed.description(error.to_string());
+    match error {
+        ResponseError::Err(_) => embed = embed.color(Colour::RED),
+        ResponseError::Warn(_) => embed = embed.color(Colour::GOLD),
+        ResponseError::Info(_) => embed = embed.color(Colour::BLITZ_BLUE),
+    };
+
+    CommandResponse::new_embeds(vec![embed]).ephemeral()
 }

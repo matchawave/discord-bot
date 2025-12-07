@@ -25,7 +25,7 @@ pub fn command() -> ICommand {
     .min_int_value(1);
     ICommand::new(NAME, DESCRIPTION)
         .options(vec![index_option])
-        .permissions(vec![BotPermission::ManageGuild])
+        .permissions(vec![BotPermission::ManageMessages])
         .callbacks(vec![
             CommandCallbackType::slash(interaction),
             CommandCallbackType::legacy(legacy),

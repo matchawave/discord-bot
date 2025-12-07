@@ -18,7 +18,7 @@ dashmap = { workspace = true }
 colored = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-serde_with = { version = "3.16" }
+serde_with = { workspace = true }
 fastrand = "2.3"
 
 tokio = { workspace = true }
