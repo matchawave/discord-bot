@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use serenity::{
-    all::{ChannelId, Context, Message, MessageId, ShardId},
+    all::{ChannelId, Context, Message, MessageId},
     async_trait,
 };
 use utils::{Http, Pointer, error, info};

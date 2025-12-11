@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use serenity::{
-    all::{ChannelId, Context, Event, GuildId, ShardId, UserId},
+    all::{ChannelId, Context, GuildId, UserId},
     async_trait,
 };
 use utils::{DiscordEvent, Http, Pointer, info};

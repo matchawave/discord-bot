@@ -1,4 +1,4 @@
-use framework::{GlobalExtractable, global::UserConfigHash};
+use framework::global::UserConfigHash;
 use serenity::prelude::TypeMap;
 
 use crate::configs::VoiceConfig;

@@ -16,7 +16,7 @@ use serenity::{
     Client,
     all::{
         Colour, CommandInteraction, Context, CreateCommand, CreateEmbed, CreateInteractionResponse,
-        CreateMessage, GuildId, Member, Message,
+        CreateMessage, GuildId, Mentionable, Message, PartialGuild,
     },
     async_trait,
     prelude::TypeMap,
@@ -25,11 +25,8 @@ use tokio::sync::RwLock;
 use utils::{ElapsedTime, Http, Parser, Pointer, ResponseError, debug, error, info};
 
 use crate::{
-    Extractable, ShardData,
     command::response::CommandResponse,
-    data::{
-        CommandAliases, Cooldown, Cooldowns, Data, DefaultPrefix, Ephemeral, Ephemerals, Prefix,
-    },
+    data::{CommandAliases, Cooldown, Cooldowns, DefaultPrefix, Ephemeral, Ephemerals, Prefix},
     extractors::{ContextEventExtractor, ContextExtractor, Extractor},
     global::Commands,
     guilds::{FakePerms, GuildMap, HTTPGetter, Members},
@@ -177,10 +174,6 @@ impl CommandExecution<Message> for CommandManager {
         let command = command.get(&command_name)?;
 
         let callbacks = &command.callbacks;
-        let Some(p_manager) = Arc::<ProcessManager>::extract_context(ctx).await else {
-            error!("Failed to extract ProcessManager from context");
-            return None;
-        };
 
         let Some(member) = (match Members::extract(ctx, &action, parser).await {
             Some(members) => members.fetch(&ctx.http, (guild_id, msg.author.id)).await,
@@ -193,23 +186,49 @@ impl CommandExecution<Message> for CommandManager {
             return None;
         };
 
-        if let Some(fake_perms) = FakePerms::extract_context_event(ctx, &action).await
+        let guild = match guild_map.read().await.get::<Pointer<PartialGuild>>() {
+            Some(guild_ptr) => guild_ptr.make_clone().await,
+            None => {
+                error!(
+                    "Failed to extract Guild {} for command '{}'",
+                    guild_id, command_name
+                );
+                return None;
+            }
+        };
+
+        let Some(p_manager) = Arc::<ProcessManager>::extract_context(ctx).await else {
+            error!("Failed to extract ProcessManager from context");
+            return None;
+        };
+
+        if guild.owner_id != member.user.id
+            && let Some(fake_perms) = FakePerms::extract_context_event(ctx, &action).await
             && let Some(missing_perms) = fake_perms
                 .member_lacks_permission(&member, &command.permissions)
                 .await
         {
+            let text = if missing_perms.len() == 1 {
+                "permission: "
+            } else {
+                "permissions:\n"
+            };
+
             let missing_perms_str = missing_perms
                 .par_iter()
                 .map(|p| format!("`{}`", p))
                 .collect::<Vec<String>>()
                 .join(", ");
+
             let response = create_error_embed(ResponseError::Warn(format!(
-                "You lack the following permissions to run this command: \n{}",
+                "{}: You're **missing** {}{}",
+                member.user.id.mention(),
+                text,
                 missing_perms_str
             )));
 
             send_message(&ctx.http, &p_manager, &response, msg);
-            return None;
+            return Some(command_name);
         }
 
         if let Some(cooldown_num) = command.cooldown

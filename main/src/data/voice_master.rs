@@ -1,9 +1,10 @@
-use std::collections::HashMap;
-
-use framework::{DataExtract, Extractable, extractors::Extractor, guilds::Guilds};
+use framework::{
+    extractors::{ContextExtractor, EventExtractor, Extractor},
+    guilds::Guilds,
+};
 
 use serenity::{
-    all::{ChannelId, Context, GuildId},
+    all::{Context, GuildId},
     async_trait,
 };
 use utils::{Parser, Pointer};
@@ -15,12 +16,12 @@ pub struct VoiceMaster(pub Pointer<VoiceMasterConfig>);
 #[async_trait]
 impl<T> Extractor<T> for VoiceMaster
 where
-    GuildId: Extractor<T>,
+    GuildId: EventExtractor<T>,
     T: Send + Sync + 'static,
 {
-    async fn extract(ctx: &Context, ev: &T, p: &Pointer<Parser>) -> Option<VoiceMaster> {
-        let guild_id = GuildId::extract(ctx, ev, p).await?;
-        let guilds = Guilds::extract(ctx, ev, p).await?;
+    async fn extract(ctx: &Context, ev: &T, _: &Pointer<Parser>) -> Option<VoiceMaster> {
+        let guild_id = GuildId::extract_event(ev).await?;
+        let guilds = Guilds::extract_context(ctx).await?;
         (guilds.get_ptr::<VoiceMasterConfig>(guild_id).await).map(VoiceMaster)
     }
 }

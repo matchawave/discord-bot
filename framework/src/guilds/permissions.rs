@@ -49,7 +49,7 @@ impl FakePerms {
     ) -> bool {
         let read = self.0.read().await;
         for permission in permissions {
-            if let Some(perm_config_ptr) = read.get(&permission) {
+            if let Some(perm_config_ptr) = read.get(permission) {
                 let perm_config = perm_config_ptr.read().await;
                 if perm_config.users.par_iter().any(|&id| id == member.user.id) {
                     return true;
@@ -72,22 +72,20 @@ impl FakePerms {
         let mut missing_perms = Vec::new();
         let read = self.0.read().await;
         for permission in permissions {
-            if let Some(perm_config_ptr) = read.get(&permission) {
+            let mut has_role = false;
+            if let Some(perm_config_ptr) = read.get(permission) {
                 let perm_config = perm_config_ptr.read().await;
                 if perm_config.users.par_iter().any(|&id| id == member.user.id) {
                     continue;
                 }
-                let mut has_role = false;
                 for role in &perm_config.roles {
                     if member.roles.par_iter().any(|r| r == role) {
                         has_role = true;
                         break;
                     }
                 }
-                if !has_role {
-                    missing_perms.push(*permission);
-                }
-            } else {
+            }
+            if !has_role {
                 missing_perms.push(*permission);
             }
         }

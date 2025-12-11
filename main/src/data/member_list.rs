@@ -1,9 +1,7 @@
 use std::collections::HashMap;
 
 use framework::{
-    DataExtract, DataExtractable, Extractable,
-    data::{self, Data},
-    extractors::Extractor,
+    extractors::{ContextEventExtractor, ContextExtractor, EventExtractor, Extractor},
     guilds::Guilds,
 };
 use serenity::{
@@ -61,14 +59,14 @@ impl TypeMapKey for MemberList {
 }
 
 #[async_trait]
-impl<T> Extractor<T> for MemberList
+impl<T> ContextEventExtractor<T> for MemberList
 where
     T: Send + Sync + 'static,
-    GuildId: Extractor<T>,
+    GuildId: EventExtractor<T>,
 {
-    async fn extract(ctx: &Context, ev: &T, p: &Pointer<Parser>) -> Option<Self> {
-        let guild_id = GuildId::extract(ctx, ev, p).await?;
-        let guilds = Guilds::extract(ctx, ev, p).await?;
+    async fn extract_context_event(ctx: &Context, ev: &T) -> Option<Self> {
+        let guild_id = GuildId::extract_event(ev).await?;
+        let guilds = Guilds::extract_context(ctx).await?;
 
         match guilds
             .get::<MemberList, MemberMap>(guild_id)
@@ -90,5 +88,16 @@ where
                     .ok()
             }
         }
+    }
+}
+
+#[async_trait]
+impl<T> Extractor<T> for MemberList
+where
+    T: Send + Sync + 'static,
+    GuildId: EventExtractor<T>,
+{
+    async fn extract(ctx: &Context, ev: &T, _: &Pointer<Parser>) -> Option<Self> {
+        MemberList::extract_context_event(ctx, ev).await
     }
 }

@@ -2,11 +2,10 @@ use std::sync::Arc;
 
 use serenity::{
     Client,
-    all::{Context, ShardId},
+    all::Context,
     async_trait,
     prelude::{TypeMap, TypeMapKey},
 };
-use tokio::sync::RwLock;
 use utils::{DataType, Http, Pointer, info};
 
 use crate::extractors::{ContextExtractor, Extractor};
@@ -42,7 +41,7 @@ impl ProcessManager {
     }
 
     pub async fn init_loop(&self) {
-        let data = self.data.clone();
+        // let data = self.data.clone();
         info!("(processes) Starting process loop");
         for p in self.process_vec.iter() {
             let process = p.clone();

@@ -7,7 +7,6 @@ pub mod guilds;
 pub mod processes;
 
 pub use macros::*;
-use tokio::sync::RwLock;
 use utils::Pointer;
 
 use std::sync::Arc;
@@ -23,14 +22,6 @@ use crate::guilds::Guilds;
 pub trait Extractable {
     fn init(map: &mut TypeMap);
     fn retrieve(map: &Arc<TypeMap>) -> Option<Self>
-    where
-        Self: Sized;
-}
-
-#[async_trait]
-pub trait GlobalExtractable {
-    fn init(map: &mut TypeMap);
-    async fn retrieve(map: &Arc<RwLock<TypeMap>>) -> Option<Self>
     where
         Self: Sized;
 }

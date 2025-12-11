@@ -174,9 +174,9 @@ impl ResponseError {
 impl std::fmt::Display for ResponseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ResponseError::Err(msg) => write!(f, "Error: {}", msg),
-            ResponseError::Warn(msg) => write!(f, "Warning: {}", msg),
-            ResponseError::Info(msg) => write!(f, "Info: {}", msg),
+            ResponseError::Err(msg) => write!(f, "{}", msg),
+            ResponseError::Warn(msg) => write!(f, "{}", msg),
+            ResponseError::Info(msg) => write!(f, "{}", msg),
         }
     }
 }

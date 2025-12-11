@@ -1,10 +1,9 @@
 use std::collections::HashMap;
 
-use framework::{DataExtract, DataExtractable, Extractable, extractors::Extractor};
 use serenity::{all::GuildId, prelude::TypeMapKey};
 use utils::{DataType, Pointer};
 
-#[derive(Clone, Default, DataExtractable, DataExtract)]
+#[derive(Clone, Default)]
 pub struct States(Pointer<HashMap<GuildId, DataType>>);
 
 impl TypeMapKey for States {

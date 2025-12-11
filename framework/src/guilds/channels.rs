@@ -96,14 +96,6 @@ impl super::HTTPGetter<(GuildId, ChannelId), GuildChannel> for Channels {
         }
     }
 }
-
-#[async_trait]
-impl super::HTTPGetter<GuildId, HashMap<ChannelId, GuildChannel>> for Channels {
-    async fn fetch(&self, http: &Http, key: GuildId) -> Option<HashMap<ChannelId, GuildChannel>> {
-        Some(self.0.make_clone().await)
-    }
-}
-
 #[async_trait]
 impl<T> ContextEventExtractor<T> for GuildChannel
 where
