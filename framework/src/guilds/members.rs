@@ -6,7 +6,7 @@ use serenity::{
     async_trait,
     prelude::TypeMapKey,
 };
-use utils::{Http, Parser, Pointer, error};
+use utils::{HttpType, Parser, Pointer, error};
 
 use crate::{
     ShardData,
@@ -58,7 +58,7 @@ where
 
 #[async_trait]
 impl super::HTTPGetter<(GuildId, UserId), Member> for Members {
-    async fn fetch(&self, http: &Http, key: (GuildId, UserId)) -> Option<Member> {
+    async fn fetch(&self, http: &HttpType, key: (GuildId, UserId)) -> Option<Member> {
         let (guild_id, user_id) = key;
         match self.0.get(&user_id).await {
             Some(m) => Some(m.make_clone().await),

@@ -7,7 +7,7 @@ use serenity::all::{
     ChannelId, Colour, CommandOptionType, CreateAllowedMentions, CreateCommandOption, CreateEmbed,
     CreateMessage, GuildId, Member, Mentionable,
 };
-use utils::{BotPermission, Http, error};
+use utils::{BotPermission, HttpType, error};
 
 use super::{super::super::author_embed, interaction_index, legacy_index};
 use crate::{cache::snipe::ReactionSnipes, no_snipes};
@@ -31,8 +31,9 @@ pub fn command() -> ICommand {
             CommandCallbackType::legacy(legacy),
         ])
 }
+#[allow(clippy::too_many_arguments)]
 async fn interaction(
-    http: Http,
+    http: HttpType,
     guild_id: GuildId,
     channel_id: ChannelId,
     snipes: ReactionSnipes,
@@ -54,7 +55,7 @@ async fn interaction(
 }
 
 async fn legacy(
-    http: Http,
+    http: HttpType,
     guild_id: GuildId,
     channel_id: ChannelId,
     snipes: ReactionSnipes,
@@ -75,7 +76,7 @@ async fn legacy(
     }
 }
 async fn execute(
-    http: Http,
+    http: HttpType,
     guild_id: GuildId,
     channel_id: ChannelId,
     snipes: ReactionSnipes,

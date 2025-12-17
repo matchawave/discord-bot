@@ -1,14 +1,8 @@
 use framework::guilds::Messages;
-use serenity::{
-    all::{GuildId, Message, PartialGuild, Reaction},
-    futures::channel,
-};
+use serenity::all::{Message, PartialGuild, Reaction};
 use utils::{Pointer, debug};
 
-use crate::{
-    cache::snipe::{EditSnipes, ReactionSnipes, Snipes},
-    events::message,
-};
+use crate::cache::snipe::{EditSnipes, ReactionSnipes, Snipes};
 
 macro_rules! log_message_event {
     ($action:expr, $guild:expr, $message_id:expr) => {

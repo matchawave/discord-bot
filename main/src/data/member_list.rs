@@ -4,6 +4,7 @@ use framework::{
     extractors::{ContextEventExtractor, ContextExtractor, EventExtractor, Extractor},
     guilds::Guilds,
 };
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serenity::{
     all::{Context, GuildId, Member, UserId},
     async_trait,
@@ -14,7 +15,7 @@ use utils::{MemberData, Parser, Pointer, error};
 type MemberMap = HashMap<UserId, MemberData>;
 
 #[derive(Clone, Default)]
-pub struct MemberList(pub Pointer<MemberMap>);
+pub struct MemberList(Pointer<MemberMap>);
 
 impl MemberList {
     pub async fn remove(&self, user_id: UserId) -> Option<MemberData> {
@@ -37,10 +38,25 @@ impl MemberList {
         (self.0.read().await).get(&user_id).cloned()
     }
 
+    pub async fn count(&self) -> (usize, usize) {
+        (self.0.read().await.par_iter())
+            .fold(
+                || (0, 0),
+                |(h, b), (_id, data)| {
+                    if data.is_bot { (h, b + 1) } else { (h + 1, b) }
+                },
+            )
+            .reduce(|| (0, 0), |(h1, b1), (h2, b2)| (h1 + h2, b1 + b2))
+    }
+
+    pub async fn len(&self) -> usize {
+        self.0.read().await.len()
+    }
+
     pub async fn debug_print(&self) -> String {
         let data = self.0.read().await;
         if data.is_empty() {
-            return format!("Members Info is empty.");
+            return "Members Info is empty.".to_string();
         }
         let mut output = String::new();
         output.push_str(&format!("\nTotal Members: {}", data.len()));
@@ -55,7 +71,7 @@ impl MemberList {
 }
 
 impl TypeMapKey for MemberList {
-    type Value = Pointer<HashMap<UserId, MemberData>>;
+    type Value = Pointer<MemberMap>;
 }
 
 #[async_trait]

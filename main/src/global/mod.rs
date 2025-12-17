@@ -1,8 +1,8 @@
-use framework::global::UserConfigHash;
+use framework::global::GlobalMap;
 use serenity::prelude::TypeMap;
 
-use crate::configs::VoiceConfig;
+use crate::configs::voice::VoiceConfig;
 
 pub fn set_global(data: &mut TypeMap) {
-    // UserConfigHash::<VoiceConfig>::init(data);
+    data.insert::<GlobalMap<VoiceConfig>>(GlobalMap::default());
 }

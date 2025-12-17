@@ -113,17 +113,8 @@ async fn get_description(
 }
 
 async fn get_members(members: MemberList) -> String {
-    let members = members.0.read().await;
-    let total = members.len();
-    let (humans, bots) = members
-        .par_iter()
-        .fold(
-            || (0, 0),
-            |(h, b), (_id, data)| {
-                if data.is_bot { (h, b + 1) } else { (h + 1, b) }
-            },
-        )
-        .reduce(|| (0, 0), |(h1, b1), (h2, b2)| (h1 + h2, b1 + b2));
+    let total = members.len().await;
+    let (humans, bots) = members.count().await;
 
     format!(
         "Total Members: {}\nHumans: {}\nBots: {}",

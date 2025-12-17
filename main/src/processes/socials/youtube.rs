@@ -14,7 +14,7 @@ build_process!(YoutubeProcess, HashMap<String, String>);
 
 #[async_trait]
 impl ProcessLoop for YoutubeProcess {
-    async fn process(&self, http: utils::Http) {
+    async fn process(&self, http: utils::HttpType, data: utils::DataType) {
         loop {}
         // Your YouTube processing logic here
     }

@@ -5,7 +5,7 @@ mod pagination;
 mod parser;
 mod permissions;
 
-use std::{ops::Deref, sync::Arc};
+use std::{fmt::Debug, ops::Deref, sync::Arc};
 
 pub use discord::*;
 pub use legacy::*;
@@ -13,13 +13,16 @@ pub use logging::*;
 pub use pagination::*;
 pub use parser::*;
 pub use permissions::*;
+use serde::Serialize;
 use serenity::{
     all::{Member, Timestamp},
     prelude::TypeMapKey,
 };
-use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+use tokio::{
+    sync::{RwLock, RwLockReadGuard, RwLockWriteGuard},
+    task,
+};
 
-#[derive(Debug)]
 pub struct Pointer<T: ?Sized>(Arc<RwLock<T>>)
 where
     T: Send + Sync + 'static;
@@ -112,6 +115,21 @@ impl<T: Send + Sync + 'static> TypeMapKey for Pointer<T> {
     type Value = Pointer<T>;
 }
 
+// impl<T: Debug> std::fmt::Debug for Pointer<T> {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         write!(f, "Pointer {{ {:?} }}", self.0)
+//     }
+// }
+
+impl<T> std::fmt::Debug for Pointer<T>
+where
+    T: Send + Sync + 'static,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Pointer < {:?} >", std::any::type_name::<T>())
+    }
+}
+
 #[derive(Debug)]
 pub struct ElapsedTime {
     start: std::time::Instant,
@@ -149,7 +167,7 @@ impl ElapsedTime {
     }
 }
 
-pub type Http = Arc<serenity::http::Http>;
+pub type HttpType = Arc<serenity::http::Http>;
 pub type DataType = Arc<RwLock<serenity::prelude::TypeMap>>;
 
 pub enum ResponseError {

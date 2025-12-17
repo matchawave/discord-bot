@@ -5,7 +5,7 @@ use serenity::all::{
     CommandInteraction, CreateInteractionResponse, CreateInteractionResponseMessage,
     EditInteractionResponse, EditMessage, Message, ShardId, ShardManager,
 };
-use utils::{ElapsedTime, Http, command_warn, error};
+use utils::{ElapsedTime, HttpType, command_warn, error};
 
 const NAME: &str = "ping";
 const DESCRIPTION: &str = "Check the bot's latency";
@@ -25,7 +25,7 @@ const PING_RESPONSE_TEMPLATE: &str = "Pong! It took {time} to ping.";
 async fn interaction(
     shard_id: ShardId,
     shard_manager: Arc<ShardManager>,
-    http: Http,
+    http: HttpType,
     interaction: CommandInteraction,
 ) -> CommandResult {
     let Some(latency) = get_latency(shard_id, shard_manager).await else {
@@ -59,7 +59,7 @@ async fn interaction(
 async fn legacy(
     shard_id: ShardId,
     shard_manager: Arc<ShardManager>,
-    http: Http,
+    http: HttpType,
     msg: Message,
 ) -> CommandResult {
     let Some(latency) = get_latency(shard_id, shard_manager).await else {

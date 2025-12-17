@@ -2,11 +2,11 @@ use serenity::{
     all::{GuildId, Member},
     futures::StreamExt,
 };
-use utils::{Http, error, info};
+use utils::{HttpType, error, info};
 
 use crate::data::member_list::MemberList;
 
-pub async fn get_members(guild_id: GuildId, members_list: MemberList, http: Http) {
+pub async fn get_members(guild_id: GuildId, members_list: MemberList, http: HttpType) {
     tokio::spawn(async move {
         let mut members = guild_id.members_iter(http).boxed();
         info!("Fetching members for guild {}...", guild_id);

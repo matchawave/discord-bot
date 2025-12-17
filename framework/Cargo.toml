@@ -13,11 +13,14 @@ fastrand = "2.3"
 rayon = { workspace = true }
 serde = { workspace = true }
 serde_with = { workspace = true }
+serde_json = { workspace = true }
+downcast-rs = "2"
 
 tokio = { workspace = true }
 tokio-tungstenite = { version = "0.28", default-features = false, features = [
     'rustls',
     'connect',
+    'rustls-tls-native-roots',
 ] }
 utils = { path = "../utils" }
 moka = { workspace = true }

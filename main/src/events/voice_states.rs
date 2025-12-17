@@ -1,25 +1,22 @@
-use std::{
-    sync::Arc,
-    time::{Duration, Instant},
-};
+use std::{sync::Arc, time::Instant};
 
 use framework::{
     data::{Cooldown, Cooldowns},
     extractors::CurrentBot,
-    global::UserConfigHash,
+    global::GlobalMap,
     guilds::{ChannelMembers, Channels, HTTPGetter, VoiceStates},
 };
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator};
 use serenity::all::{
     ChannelId, ChannelType, CreateChannel, GuildId, Member, PartialGuild, VoiceState,
 };
-use utils::{Formatter, Http, Parser, Pointer, debug, error};
+use utils::{Formatter, HttpType, Parser, Pointer, debug, error};
 
-use crate::{configs::VoiceConfig, data::voice_master::VoiceMaster};
+use crate::{configs::voice::VoiceConfig, data::voice_master::VoiceMaster};
 
 pub async fn channels(
     CurrentBot(bot): CurrentBot,
-    guild_id: GuildId,
+    _guild_id: GuildId,
     member: Member,
     new_state: VoiceState,
     VoiceStates(voice_states): VoiceStates,
@@ -51,10 +48,10 @@ pub async fn channels(
             }
         } // read locks on channel_members and v are dropped here
 
-        if let Some(i) = index_to_remove {
-            if let Some(v) = channel_members.read().await.get(&old_channel_id) {
-                v.write().await.remove(i);
-            }
+        if let Some(i) = index_to_remove
+            && let Some(v) = channel_members.read().await.get(&old_channel_id)
+        {
+            v.write().await.remove(i);
         }
     } else {
         // ! TODO: Handle case where voice state was not cached
@@ -82,11 +79,11 @@ pub async fn channels(
 
 #[allow(clippy::too_many_arguments)]
 pub async fn delete(
-    http: Http,
+    http: HttpType,
     guild_id: GuildId,
     member: Member,
     VoiceStates(states): VoiceStates,
-    VoiceMaster(voice_master_ptr): VoiceMaster,
+    voice_master: VoiceMaster,
     Channels(channels): Channels,
     ChannelMembers(channel_members): ChannelMembers,
 ) {
@@ -115,9 +112,8 @@ pub async fn delete(
         return;
     }
 
-    let voice_master = voice_master_ptr.make_clone().await;
-
-    if voice_master.is_master(channel_id).is_some() {
+    let config = voice_master.config;
+    if config.read().await.masters.contains_key(&channel_id) {
         // It is a master channel, do not delete
         debug!(
             "Channel {} is a master channel in guild {}, not deleting",
@@ -126,7 +122,8 @@ pub async fn delete(
         return;
     }
 
-    if voice_master.get_active(channel_id).is_none() {
+    let actives = voice_master.actives;
+    if actives.read().await.get(&channel_id).is_none() {
         // Not an active channel, do not delete
         debug!(
             "Channel {} is not an active voice master channel in guild {}, not deleting",
@@ -134,7 +131,7 @@ pub async fn delete(
         );
         return;
     }
-    let mut should_delete = false;
+
     if let Some(members) = channel_members.read().await.get(&channel_id) {
         let members_read = members.read().await;
         if !members_read.is_empty() {
@@ -145,17 +142,11 @@ pub async fn delete(
             );
             return;
         }
-        should_delete = true;
     }
 
-    if should_delete {
-        channel_members.write().await.remove(&channel_id); // Clean up channel members data
-    }
+    actives.write().await.remove(&channel_id); // Remove from active channels
+    channel_members.write().await.remove(&channel_id); // Clean up channel members data
 
-    {
-        let mut voice_master = voice_master_ptr.write().await;
-        voice_master.remove_active(channel_id); // Remove from active channels
-    }
     if let Err(e) = http
         .delete_channel(channel_id, Some("Voice master cleanup"))
         .await
@@ -170,19 +161,21 @@ pub async fn delete(
 
 #[allow(clippy::too_many_arguments)]
 pub async fn create(
-    http: Http,
+    http: HttpType,
     guild: PartialGuild,
     member: Member,
     new: VoiceState,
-    VoiceMaster(voice_master_ptr): VoiceMaster,
+    voice_master: VoiceMaster,
     channels: Channels,
-    configs: UserConfigHash<VoiceConfig>,
+    configs: GlobalMap<VoiceConfig>,
     cooldowns: Arc<Cooldowns>,
     parser: Pointer<Parser>,
 ) {
-    let v_m = voice_master_ptr.make_clone().await;
+    // let v_m = voice_master.config.make_clone().await;
+    let config = voice_master.config;
+
     if let Some(new_channel_id) = new.channel_id
-        && let Some(master) = v_m.is_master(new_channel_id)
+        && let Some(master) = config.read().await.masters.get(&new_channel_id)
     // Check if joined channel is a master channel
     {
         let guild_id = guild.id;
@@ -197,10 +190,7 @@ pub async fn create(
                 );
                 return;
             } else {
-                (cooldowns.0.write().await).insert(
-                    cooldown,
-                    Instant::now() + Duration::from_millis(cooldown_num),
-                );
+                (cooldowns.0.write().await).insert(cooldown, Instant::now() + cooldown_num);
             }
         }
 
@@ -227,7 +217,8 @@ pub async fn create(
             return; // Not a voice channel (technical not possible, but just in case)
         }
 
-        let config = match v_m.get_config(new_channel_id) {
+        let config_format = match (config.read().await.configs).get(&new_channel_id) {
+            // Get specific config for this master channel
             Some(c) => Some(c.clone()),
             None => configs.get_cloned(guild_id, member.user.id).await,
         };
@@ -238,10 +229,9 @@ pub async fn create(
             member.user.name.clone(),
             guild_id,
             parent_id,
-            config,
+            config_format,
             parser.make_clone().await,
         );
-
         match http
             .create_channel(guild_id, &channel, Some("Voice master created channel"))
             .await
@@ -251,7 +241,8 @@ pub async fn create(
                     "Created voice master channel {} for user {} in guild {}",
                     created.id, member.user.id, guild_id
                 );
-                (voice_master_ptr.write().await).insert_active(created.id, member.user.id);
+                let channels = voice_master.actives;
+                (channels.write().await).insert(created.id, member.user.id);
 
                 // Move user to new channel
                 if let Err(e) = guild_id.move_member(http, member.user.id, created.id).await {

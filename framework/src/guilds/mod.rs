@@ -18,7 +18,7 @@ use serenity::{
     prelude::{TypeMap, TypeMapKey},
 };
 use std::{collections::HashMap, hash::Hash};
-use utils::{Http, Parser, Pointer, error};
+use utils::{HttpType, Parser, Pointer, error};
 
 use crate::{
     Extractable, ShardData,
@@ -316,5 +316,5 @@ where
 
 #[async_trait]
 pub trait HTTPGetter<Key, T> {
-    async fn fetch(&self, http: &Http, key: Key) -> Option<T>;
+    async fn fetch(&self, http: &HttpType, key: Key) -> Option<T>;
 }

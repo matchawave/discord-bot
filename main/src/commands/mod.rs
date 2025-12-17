@@ -3,7 +3,7 @@ use framework::{
     guilds::{HTTPGetter, Members},
 };
 use serenity::all::{CreateEmbedAuthor, Member, User, UserId};
-use utils::Http;
+use utils::HttpType;
 mod configuration;
 mod example;
 mod utilities;
@@ -21,7 +21,7 @@ pub fn author_embed(user: &User) -> CreateEmbedAuthor {
 }
 
 pub async fn get_author_embed(
-    http: Http,
+    http: HttpType,
     members: Members,
     target: &Member,
     author_id: UserId,

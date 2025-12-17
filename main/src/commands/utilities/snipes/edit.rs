@@ -7,7 +7,7 @@ use serenity::all::{
     ChannelId, Colour, CommandOptionType, CreateAllowedMentions, CreateCommandOption, CreateEmbed,
     CreateMessage, GuildId, Member, Mentionable,
 };
-use utils::{BotPermission, Http, error};
+use utils::{BotPermission, HttpType, error};
 
 use crate::{cache::snipe::EditSnipes, no_snipes};
 
@@ -34,7 +34,7 @@ pub fn command() -> ICommand {
 }
 
 async fn interaction(
-    http: Http,
+    http: HttpType,
     _guild_id: GuildId,
     channel_id: ChannelId,
     snipes: EditSnipes,
@@ -51,7 +51,7 @@ async fn interaction(
 }
 
 async fn legacy(
-    http: Http,
+    http: HttpType,
     _guild_id: GuildId,
     channel_id: ChannelId,
     snipes: EditSnipes,
@@ -68,7 +68,7 @@ async fn legacy(
 }
 
 async fn execute(
-    http: Http,
+    http: HttpType,
     channel_id: ChannelId,
     snipes_repo: EditSnipes,
     messages: Messages,

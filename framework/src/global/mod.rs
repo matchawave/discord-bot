@@ -23,7 +23,7 @@ pub enum UserGlobalType {
     User(UserId),
 }
 
-impl<V> Default for UserConfigHash<V>
+impl<V> Default for GlobalMap<V>
 where
     V: Clone + Send + Sync + 'static,
 {
@@ -38,11 +38,11 @@ where
 }
 
 #[derive(Debug, Clone)]
-pub struct UserConfigHash<V>(Cache<UserGlobalType, Pointer<V>>)
+pub struct GlobalMap<V>(Cache<UserGlobalType, Pointer<V>>)
 where
     V: Clone + Send + Sync + 'static;
 
-impl<V> UserConfigHash<V>
+impl<V> GlobalMap<V>
 where
     V: Clone + Send + Sync + 'static,
 {
@@ -65,15 +65,15 @@ where
     }
 }
 
-impl<V> TypeMapKey for UserConfigHash<V>
+impl<V> TypeMapKey for GlobalMap<V>
 where
     V: Clone + Send + Sync + 'static,
 {
-    type Value = UserConfigHash<V>;
+    type Value = GlobalMap<V>;
 }
 
 #[async_trait]
-impl<T, V> Extractor<T> for UserConfigHash<V>
+impl<T, V> Extractor<T> for GlobalMap<V>
 where
     V: Clone + Send + Sync + 'static,
 {
@@ -82,17 +82,17 @@ where
         _: &T,
         _: &utils::Pointer<utils::Parser>,
     ) -> Option<Self> {
-        UserConfigHash::<V>::extract_context(ctx).await
+        GlobalMap::<V>::extract_context(ctx).await
     }
 }
 
 #[async_trait]
-impl<V> ContextExtractor for UserConfigHash<V>
+impl<V> ContextExtractor for GlobalMap<V>
 where
     V: Clone + Send + Sync + 'static,
 {
     async fn extract_context(ctx: &serenity::all::Context) -> Option<Self> {
         let data = ctx.data.read().await;
-        data.get::<UserConfigHash<V>>().cloned()
+        data.get::<GlobalMap<V>>().cloned()
     }
 }

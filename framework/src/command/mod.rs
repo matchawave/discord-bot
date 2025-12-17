@@ -22,7 +22,7 @@ use serenity::{
     prelude::TypeMap,
 };
 use tokio::sync::RwLock;
-use utils::{ElapsedTime, Http, Parser, Pointer, ResponseError, debug, error, info};
+use utils::{ElapsedTime, HttpType, Parser, Pointer, ResponseError, debug, error, info};
 
 use crate::{
     command::response::CommandResponse,
@@ -322,7 +322,7 @@ impl CommandExecution<CommandInteraction> for CommandManager {
 }
 
 pub(super) fn send_message(
-    http: &Http,
+    http: &HttpType,
     p_manager: &Arc<ProcessManager>,
     response: &CommandResponse,
     ref_msg: &Message,

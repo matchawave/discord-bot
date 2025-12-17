@@ -13,4 +13,5 @@ colored = { workspace = true }
 regex = { workspace = true }
 dashmap = { workspace = true }
 rayon = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 # moka = { workspace = true }

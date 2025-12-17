@@ -13,7 +13,7 @@ use serenity::all::{
     Role, RoleId, UserId,
 };
 use std::collections::HashMap;
-use utils::{Http, MemberOption, PERMISSION_PRIORITY, command_error};
+use utils::{HttpType, MemberOption, PERMISSION_PRIORITY, command_error};
 
 const NAME: &str = "info";
 const DESCRIPTION: &str = "Get the server information";
@@ -33,7 +33,7 @@ pub fn command() -> ICommand {
 }
 
 async fn interaction(
-    http: Http,
+    http: HttpType,
     options: InteractionOptions,
     members: Members,
     user_id: UserId,
@@ -50,7 +50,7 @@ async fn interaction(
 }
 
 async fn legacy(
-    http: Http,
+    http: HttpType,
     options: Vec<String>,
     members: Members,
     user_id: UserId,
@@ -68,7 +68,7 @@ async fn legacy(
 }
 
 async fn execute(
-    http: Http,
+    http: HttpType,
     members: Members,
     mut target: Member,
     guild: PartialGuild,

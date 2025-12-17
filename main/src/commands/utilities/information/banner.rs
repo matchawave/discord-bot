@@ -7,7 +7,7 @@ use serenity::all::{
     Colour, CommandOptionType, CreateCommandOption, CreateEmbed, CreateEmbedAuthor, GuildId,
     Member, UserId,
 };
-use utils::{Http, MemberOption, command_error};
+use utils::{HttpType, MemberOption, command_error};
 
 use crate::commands::get_author_embed;
 
@@ -29,7 +29,7 @@ pub fn command() -> ICommand {
 }
 
 async fn interaction(
-    http: Http,
+    http: HttpType,
     options: InteractionOptions,
     members: Members,
     user_id: UserId,
@@ -58,7 +58,7 @@ async fn interaction(
 }
 
 async fn legacy(
-    http: Http,
+    http: HttpType,
     options: Vec<String>,
     members: Members,
     user_id: UserId,
