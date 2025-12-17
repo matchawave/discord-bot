@@ -1,16 +1,24 @@
-use std::sync::Arc;
+use std::{
+    any::{Any, TypeId},
+    sync::Arc,
+};
 
+use downcast_rs::{DowncastSync, impl_downcast};
 use serenity::{
     Client,
     all::Context,
     async_trait,
     prelude::{TypeMap, TypeMapKey},
 };
-use utils::{DataType, Http, Pointer, info};
+use utils::{DataType, HttpType, Pointer, info};
 
-use crate::extractors::{ContextExtractor, Extractor};
+use crate::{
+    data,
+    extractors::{ContextExtractor, Extractor},
+};
 
 // use crate::data::{Cooldowns, Ephemerals};
+type DefaultStorage = dyn ProcessLoop + Send + Sync;
 
 #[macro_export]
 macro_rules! build_process {
@@ -24,10 +32,10 @@ macro_rules! build_process {
     };
 }
 
-pub struct ProcessManager {
+pub struct ProcessManager<S: ?Sized = DefaultStorage> {
     data: DataType,
-    http: Http,
-    process_vec: Vec<Arc<dyn ProcessLoop>>,
+    http: HttpType,
+    process_vec: Vec<Arc<S>>,
     process_map: TypeMap,
 }
 impl ProcessManager {
@@ -44,10 +52,11 @@ impl ProcessManager {
         // let data = self.data.clone();
         info!("(processes) Starting process loop");
         for p in self.process_vec.iter() {
-            let process = p.clone();
+            let process_struct = p.clone();
             let http = self.http.clone();
+            let data = self.data.clone();
             tokio::spawn(async move {
-                process.process(http.clone()).await;
+                process_struct.process(http.clone(), data.clone()).await;
             });
         }
     }
@@ -64,7 +73,8 @@ impl ProcessManager {
 
     pub fn get<P>(&self) -> Option<Arc<P>>
     where
-        P: TypeMapKey<Value = Arc<P>> + Send + Sync + 'static,
+        P: ProcessLoop + Send + Sync + 'static,
+        P: TypeMapKey<Value = Arc<P>>,
     {
         self.process_map.get::<P>().cloned()
     }
@@ -92,6 +102,8 @@ where
 }
 
 #[async_trait]
-pub trait ProcessLoop: Send + Sync {
-    async fn process(&self, http: utils::Http);
+pub trait ProcessLoop: Any + Send + Sync + DowncastSync {
+    async fn process(&self, http: utils::HttpType, data: utils::DataType);
 }
+
+impl_downcast!(sync ProcessLoop);

@@ -5,6 +5,7 @@ pub mod extractors;
 pub mod global;
 pub mod guilds;
 pub mod processes;
+pub mod websocket;
 
 pub use macros::*;
 use utils::Pointer;
@@ -34,6 +35,7 @@ pub trait HandlerFn<T, U>: Send + Sync + 'static {
 macro_rules! impl_handler_fn {
     ($($ty:ident),+) => {
         #[serenity::async_trait]
+        #[allow(non_snake_case)]
         impl<Func, Fut, U, $($ty,)+> HandlerFn<($($ty,)+), U> for Func
         where
             Func: FnOnce($($ty,)+) -> Fut + Send + Sync + Copy + 'static,
@@ -50,6 +52,7 @@ macro_rules! impl_handler_fn {
 }
 
 #[async_trait]
+
 impl<Func, Fut, U> HandlerFn<(), U> for Func
 where
     Func: FnOnce() -> Fut + Send + Sync + Copy + 'static,
@@ -60,6 +63,7 @@ where
         (self)().await
     }
 }
+
 impl_handler_fn!(A);
 impl_handler_fn!(A, B);
 impl_handler_fn!(A, B, C);

@@ -4,7 +4,7 @@ use serenity::{
     all::{ChannelId, Context, Message, MessageId},
     async_trait,
 };
-use utils::{Http, Pointer, error, info};
+use utils::{HttpType, Pointer, error, info};
 
 use crate::{
     build_process,
@@ -34,7 +34,7 @@ impl Ephemeral {
 
 #[async_trait]
 impl ProcessLoop for Ephemerals {
-    async fn process(&self, http: Http) {
+    async fn process(&self, http: HttpType, _data: utils::DataType) {
         loop {
             let map = self.0.read().await.clone();
             let now = std::time::Instant::now();

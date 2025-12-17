@@ -4,7 +4,7 @@ use serenity::{
     all::{ChannelId, Context, GuildId, UserId},
     async_trait,
 };
-use utils::{DiscordEvent, Http, Pointer, info};
+use utils::{DiscordEvent, HttpType, Pointer, info};
 
 use crate::{
     build_process,
@@ -68,7 +68,7 @@ where
 
 #[async_trait]
 impl ProcessLoop for Cooldowns {
-    async fn process(&self, _http: Http) {
+    async fn process(&self, _http: HttpType, _data: utils::DataType) {
         loop {
             let now = std::time::Instant::now();
             let map = self.0.read().await.clone();
