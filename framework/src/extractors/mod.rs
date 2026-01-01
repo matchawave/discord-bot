@@ -48,12 +48,6 @@ pub trait ContextEventExtractor<T>: Sized + Send + Sync + 'static {
 }
 
 #[async_trait]
-pub trait DynHandler<T>: Send + Sync {
-    type Output: Send + Sync;
-    async fn call(&self, ctx: &Context, ev: &T, p: &Pointer<Parser>) -> Option<Self::Output>;
-}
-
-#[async_trait]
 pub trait ExtractorTuple<T>: Sized {
     async fn extract_tuple(ctx: &Context, action: &T, p: &Pointer<Parser>) -> Option<Self>;
 }
@@ -97,6 +91,12 @@ where
             _args: std::marker::PhantomData,
         }
     }
+}
+
+#[async_trait]
+pub trait DynHandler<T>: Send + Sync {
+    type Output: Send + Sync;
+    async fn call(&self, ctx: &Context, ev: &T, p: &Pointer<Parser>) -> Option<Self::Output>;
 }
 
 #[async_trait]

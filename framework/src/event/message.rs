@@ -1,34 +1,29 @@
 use serenity::all::{Context, Message, MessageUpdateEvent};
-use utils::{Parser, Pointer, error};
+use utils::error;
 
-use crate::command::{CommandExecution, CommandManager};
+use crate::{
+    command::{CommandExecution, CommandManager},
+    extractors::ContextExtractor,
+};
 
 pub async fn handle_edited_command(
     ctx: &Context,
     updated_msg: &MessageUpdateEvent,
-    parser: &Pointer<Parser>,
 ) -> Option<String> {
     let mut msg = Message::default();
     updated_msg.apply_to_message(&mut msg);
-    handle_command(ctx, &msg, parser).await
+    handle_command(ctx, msg).await
 }
 
-pub async fn handle_command(
-    ctx: &Context,
-    msg: &Message,
-    parser: &Pointer<Parser>,
-) -> Option<String> {
+pub async fn handle_command(ctx: &Context, msg: Message) -> Option<String> {
     if msg.author.bot {
         return None;
     }
 
-    let command_manager = match CommandManager::get(&ctx.data).await {
-        Some(manager) => manager,
-        None => {
-            error!("CommandManager not found in TypeMap");
-            return None;
-        }
+    let Some(command_manager) = CommandManager::extract_context(ctx).await else {
+        error!("CommandManager not found in TypeMap");
+        return None;
     };
 
-    command_manager.execute(ctx, msg, parser).await
+    command_manager.execute(ctx, msg).await
 }

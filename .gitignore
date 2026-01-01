@@ -1,4 +1,4 @@
 /target
 /.history
-.env
+.env*
 Cargo.lock

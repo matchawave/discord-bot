@@ -4,10 +4,9 @@ mod message;
 mod user;
 mod voice_states;
 
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use colored::Colorize;
-use dashmap::DashMap;
 use serenity::{
     all::{Context, Event, RawEventHandler},
     async_trait,
@@ -22,44 +21,42 @@ use crate::{
 
 type EventCallback = Box<dyn DynHandler<Event, Output = ()> + Send + Sync>;
 type EventCallbacks = Vec<EventCallback>;
-type CallbackMap = DashMap<DiscordEvent, EventCallbacks>;
+type CallbackMap = HashMap<DiscordEvent, EventCallbacks>;
 
-pub struct EventManager {
-    senders: Vec<Sender<(Context, Event)>>,
-    callbacks: Arc<CallbackMap>,
-}
+#[derive(Default)]
+pub struct EventManagerBuilder(CallbackMap);
 
-impl EventManager {
-    pub fn new(shard_count: usize) -> Self {
-        let mut senders = Vec::with_capacity(shard_count);
-        let callbacks = Arc::new(DashMap::new());
-        for _ in 0..shard_count {
-            let (send, recv) = mpsc::channel(10_000);
-            tokio::spawn(worker(recv, callbacks.clone()));
-            senders.push(send);
-        }
-        Self { senders, callbacks }
-    }
-
+impl EventManagerBuilder {
     #[warn(private_bounds)]
-    pub fn add_handler<F, Args>(&self, event: DiscordEvent, callback: F)
+    pub fn add_handler<F, Args>(mut self, event: DiscordEvent, callback: F) -> Self
     where
         F: HandlerFn<Args, ()> + Send + Sync + Copy + 'static,
         Args: ExtractorTuple<Event> + Send + Sync + 'static,
     {
         let handler = HandlerBuilder::<Event, ()>::build(callback);
-        self.callbacks
-            .entry(event)
-            .or_default()
-            .push(Box::new(handler));
+        self.0.entry(event).or_default().push(Box::new(handler));
+        self
+    }
+
+    pub fn build(self, shard_count: usize) -> EventManager {
+        let mut senders = Vec::with_capacity(shard_count);
+        let callbacks = Arc::new(self.0);
+        for _ in 0..shard_count {
+            let (send, recv) = mpsc::channel(10_000);
+            tokio::spawn(worker(recv, callbacks.clone()));
+            senders.push(send);
+        }
+        EventManager(senders)
     }
 }
+
+pub struct EventManager(Vec<Sender<(Context, Event)>>);
 
 #[async_trait]
 impl RawEventHandler for EventManager {
     async fn raw_event(&self, ctx: Context, event: Event) {
         let shard_id = ctx.shard_id.get() as usize;
-        if let Some(sender) = self.senders.get(shard_id)
+        if let Some(sender) = self.0.get(shard_id)
             && let Err(e) = sender.send((ctx, event)).await
         {
             error!("Error sending event to shard {}: {}", shard_id, e);
@@ -84,7 +81,6 @@ async fn worker(mut receiver: Receiver<(Context, Event)>, callbacks: Arc<Callbac
         }
 
         notify_startup(&ctx, &event).await;
-
         let name = DiscordEvent::from(&event);
         if let Some(funcs) = callbacks.get(&name)
             && !funcs.is_empty()
@@ -118,12 +114,11 @@ async fn worker(mut receiver: Receiver<(Context, Event)>, callbacks: Arc<Callbac
 }
 
 async fn command_event(ctx: &Context, event: &Event) -> bool {
-    let parser = Pointer::new(Parser::new(ctx.shard_id));
     let elapsed = ElapsedTime::new();
-    if let Some(command_name) = match &event {
-        Event::MessageCreate(e) => message::handle_command(ctx, &e.message, &parser).await,
-        Event::MessageUpdate(e) => message::handle_edited_command(ctx, e, &parser).await,
-        Event::InteractionCreate(e) => interactions::handle(ctx, &e.interaction, &parser).await,
+    if let Some(command_name) = match event {
+        Event::MessageCreate(e) => message::handle_command(ctx, e.message.clone()).await,
+        Event::MessageUpdate(e) => message::handle_edited_command(ctx, e).await,
+        Event::InteractionCreate(e) => interactions::handle(ctx, e.interaction.clone()).await,
         _ => None,
     } {
         info!(

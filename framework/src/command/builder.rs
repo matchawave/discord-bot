@@ -66,12 +66,15 @@ impl ICommand {
     }
 }
 
-#[allow(clippy::from_over_into)]
-impl Into<Vec<CreateCommand>> for &ICommand {
-    fn into(self) -> Vec<CreateCommand> {
+impl TryInto<Vec<CreateCommand>> for &ICommand {
+    type Error = String;
+
+    fn try_into(self) -> Result<Vec<CreateCommand>, Self::Error> {
+        let name = self.name();
         if self.callbacks.is_empty() {
-            return Vec::new();
+            return Err(format!("No callbacks defined for command '{}'", name));
         }
+
         let mut commands = Vec::new();
 
         let callbacks = &self.callbacks;
@@ -121,8 +124,15 @@ impl Into<Vec<CreateCommand>> for &ICommand {
             types.push("message");
         }
 
+        if commands.is_empty() {
+            return Err(format!(
+                "No valid command types found for command '{}'",
+                name
+            ));
+        }
+
         info!("Loaded '{}' command: [ {} ]", self.name, types.join(", "));
-        commands
+        Ok(commands)
     }
 }
 

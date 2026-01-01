@@ -28,7 +28,11 @@ pub trait Extractable {
 }
 
 #[async_trait]
-pub trait HandlerFn<T, U>: Send + Sync + 'static {
+/// A trait for function handlers that can be called asynchronously
+/// with specific argument and return types.
+/// T: The type of the arguments the function takes.
+/// U: The return type of the function.
+pub trait HandlerFn<T, U>: Send + Sync + Copy + 'static {
     async fn call(self, args: T) -> U;
 }
 

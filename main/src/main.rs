@@ -14,14 +14,22 @@ mod events;
 mod extractors;
 mod global;
 mod processes;
+mod websocket;
 
 #[tokio::main]
 async fn main() {
     let shards = 1;
+    let token = env!("TOKEN");
+    let api_url = env!("BACKEND_URL");
+    let bot_id = (env!("APPLICATION_ID")
+        .parse::<u64>()
+        .map(ApplicationId::new))
+    .unwrap();
 
-    let http = Http::new(env!("TOKEN"));
+    let http = Http::new(token);
     let event_handler = events::create_event_handler(shards);
     let command_manager = commands::create_command_handler();
+    let websocket = websocket::get_websocket_connection();
 
     let mut map = TypeMap::new();
     set_global(&mut map);
@@ -30,7 +38,7 @@ async fn main() {
     command_manager.set(&mut map);
 
     let client_builder = ClientBuilder::new_with_http(http, get_guild_intents())
-        .application_id(ApplicationId::new(1340907937471660142))
+        .application_id(bot_id)
         .type_map(map)
         .raw_event_handler(event_handler);
 
@@ -38,7 +46,8 @@ async fn main() {
         Ok(mut client) => {
             command_manager.register(&client, false).await;
             set_shard_manager(&client).await;
-            processes::start_background_processes(&client).await;
+            let websocket = websocket.build(api_url, bot_id, token);
+            processes::start_background_processes(&client, websocket).await;
             if let Err(e) = client.start_shards(shards as u32).await {
                 println!("Error starting client: {:?}", e);
             }

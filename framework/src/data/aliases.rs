@@ -36,8 +36,12 @@ impl CommandAlias {
         }
     }
 
-    pub fn args_as_string(&self) -> String {
-        self.args.join(" ")
+    pub fn args_as_string(&self) -> Option<String> {
+        if self.args.is_empty() {
+            None
+        } else {
+            Some(self.args.join(" "))
+        }
     }
 }
 

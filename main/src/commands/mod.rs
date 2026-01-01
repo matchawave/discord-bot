@@ -1,5 +1,5 @@
 use framework::{
-    command::CommandManager,
+    command::{CommandManager, CommandManagerBuilder},
     guilds::{HTTPGetter, Members},
 };
 use serenity::all::{CreateEmbedAuthor, Member, User, UserId};
@@ -9,10 +9,10 @@ mod example;
 mod utilities;
 
 pub fn create_command_handler() -> CommandManager {
-    let command_manager = CommandManager::default();
-    command_manager.insert_all(utilities::module());
-    command_manager.insert_all(configuration::module());
-    command_manager
+    CommandManagerBuilder::default()
+        .add_commands(utilities::module())
+        .add_commands(configuration::module())
+        .build()
 }
 
 pub fn author_embed(user: &User) -> CreateEmbedAuthor {
