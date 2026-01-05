@@ -5,6 +5,7 @@ mod reader;
 mod writer;
 
 pub use misc::*;
+use serde::de::DeserializeOwned;
 pub use writer::WebSocketWriter;
 
 use std::{collections::HashMap, sync::Arc};
@@ -25,20 +26,30 @@ type WebSocketStreamType = WebSocketStream<MaybeTlsStream<TcpStream>>;
 type EventCallback = Box<dyn builder::WSDynHandler>;
 
 #[derive(Default)]
-pub struct WebSocketProcessorBuilder(HashMap<SocketReceiveEvent, Vec<EventCallback>>);
+pub struct WebSocketProcessorBuilder<T>(HashMap<T, Vec<EventCallback>>)
+where
+    T: std::cmp::Eq + std::hash::Hash + DeserializeOwned;
 
-impl WebSocketProcessorBuilder {
-    pub fn add_callback<F, T>(mut self, event: SocketReceiveEvent, callback: F) -> Self
+impl<T> WebSocketProcessorBuilder<T>
+where
+    T: std::cmp::Eq + std::hash::Hash + DeserializeOwned,
+{
+    pub fn add_callback<F, U>(mut self, event: T, callback: F) -> Self
     where
-        F: HandlerFn<(T, DataType, HttpType), ()> + Send + Copy + Sync + 'static,
-        T: serde::de::DeserializeOwned + Send + Sync + 'static,
+        F: HandlerFn<(U, DataType, HttpType), ()> + Send + Copy + Sync + 'static,
+        U: serde::de::DeserializeOwned + Send + Sync + 'static,
     {
-        let handler = builder::WSHandlerBuilder::<T>::build(callback);
+        let handler = builder::WSHandlerBuilder::<U>::build(callback);
         self.0.entry(event).or_default().push(Box::new(handler));
         self
     }
 
-    pub fn build(self, api_url: &str, user_id: ApplicationId, token: &str) -> WebSocketProcessor {
+    pub fn build(
+        self,
+        api_url: &str,
+        user_id: ApplicationId,
+        token: &str,
+    ) -> WebSocketProcessor<T> {
         let ws_url = format!("{}://{}/api/gateway/{}", PROTOCOL, api_url, user_id);
         let req = configs::create_request(ws_url, token);
         WebSocketProcessor {
@@ -48,12 +59,18 @@ impl WebSocketProcessorBuilder {
     }
 }
 
-pub struct WebSocketProcessor {
+pub struct WebSocketProcessor<T>
+where
+    T: DeserializeOwned + Eq + std::hash::Hash,
+{
     req: ClientRequestBuilder,
-    callbacks: HashMap<SocketReceiveEvent, Vec<EventCallback>>,
+    callbacks: HashMap<T, Vec<EventCallback>>,
 }
 
-impl WebSocketProcessor {
+impl<T> WebSocketProcessor<T>
+where
+    T: DeserializeOwned + Eq + std::hash::Hash,
+{
     async fn connect(&self) -> Option<(writer::SocketWriter, reader::SocketReader)> {
         let config = configs::create_config();
 
@@ -79,17 +96,22 @@ impl WebSocketProcessor {
     }
 }
 
-impl TypeMapKey for WebSocketProcessor {
-    type Value = Arc<WebSocketProcessor>;
+impl<T> TypeMapKey for WebSocketProcessor<T>
+where
+    T: DeserializeOwned + Eq + std::hash::Hash + Send + Sync + 'static,
+{
+    type Value = Arc<WebSocketProcessor<T>>;
 }
 
 #[async_trait]
-impl ProcessLoop for WebSocketProcessor {
+impl<T> ProcessLoop for WebSocketProcessor<T>
+where
+    T: DeserializeOwned + Eq + std::hash::Hash + Default + Send + Sync + 'static,
+{
     async fn process(&self, http: HttpType, data: DataType) {
         // Here you would implement the WebSocket connection logic
         let ws_text = "websocket".yellow();
         info!("({ws_text}) Starting WebSocket connection");
-        // Example: Establish connection using self.req
 
         loop {
             if let Some((writer, reader)) = self.connect().await {

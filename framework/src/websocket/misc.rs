@@ -16,17 +16,3 @@ impl<T> WsEnvelope<T> {
         Self { event, data }
     }
 }
-
-#[derive(Hash, Eq, PartialEq, Serialize)]
-pub enum SocketSendEvent {
-    Ping,
-}
-
-#[derive(Hash, Eq, PartialEq, Deserialize)]
-pub enum SocketReceiveEvent {
-    Pong,
-}
-
-pub enum SocketEventPayload {
-    Pong,
-}

@@ -5,11 +5,15 @@ use framework::{
 };
 use serenity::Client;
 
-use crate::processes::socials::YoutubeProcess;
+use crate::{processes::socials::YoutubeProcess, websocket::SocketReceiveEvent};
 
+mod backend;
 mod socials;
 
-pub async fn start_background_processes(client: &Client, websocket: WebSocketProcessor) {
+pub async fn start_background_processes(
+    client: &Client,
+    websocket: WebSocketProcessor<SocketReceiveEvent>,
+) {
     let mut manager = ProcessManager::new(client);
     manager.register_process(websocket);
     manager.register_process(Cooldowns::default());

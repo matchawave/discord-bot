@@ -1,25 +1,36 @@
 use std::collections::HashMap;
 
 use colored::Colorize;
+use serde::de::DeserializeOwned;
 use serenity::futures::{StreamExt, stream::SplitStream};
 use tokio_tungstenite::tungstenite::Message;
 use utils::{DataType, HttpType, error, info};
 
-use super::{EventCallback, SocketReceiveEvent, WebSocketStreamType, WsEnvelope};
+use super::{EventCallback, WebSocketStreamType, WsEnvelope};
 
 pub(super) type SocketReader = SplitStream<WebSocketStreamType>;
 
-pub(super) async fn read_socket(
+pub(super) async fn read_socket<T>(
     mut reader: SocketReader,
-    callbacks: &HashMap<SocketReceiveEvent, Vec<EventCallback>>,
+    callbacks: &HashMap<T, Vec<EventCallback>>,
     http: HttpType,
     data: DataType,
-) {
+) where
+    T: DeserializeOwned + Eq + std::hash::Hash + Default,
+{
     let ws_text = "websocket".yellow();
+    if let Some(callback_vec) = callbacks.get(&T::default()) {
+        for callback in callback_vec.iter() {
+            callback
+                .call(serde_json::Value::Null, data.clone(), http.clone())
+                .await;
+        }
+    }
+
     while let Some(message) = reader.next().await {
         match message {
             Ok(Message::Text(msg)) => {
-                let envelope: WsEnvelope<SocketReceiveEvent> = match serde_json::from_str(&msg) {
+                let envelope: WsEnvelope<T> = match serde_json::from_str(&msg) {
                     Ok(env) => env,
                     Err(e) => {
                         error!("({ws_text}) Error deserializing message: {:?}", e);
