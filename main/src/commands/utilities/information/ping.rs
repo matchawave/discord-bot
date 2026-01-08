@@ -1,6 +1,9 @@
 use std::{sync::Arc, time::Duration};
 
-use framework::command::{CommandCallbackType, CommandResult, ICommand};
+use framework::{
+    command::{CommandCallbackType, CommandResult, ICommand},
+    extractors::ShardManagerContainer,
+};
 use serenity::all::{
     CommandInteraction, CreateInteractionResponse, CreateInteractionResponseMessage,
     EditInteractionResponse, EditMessage, Message, ShardId, ShardManager,
@@ -24,7 +27,7 @@ const PING_RESPONSE_TEMPLATE: &str = "Pong! It took {time} to ping.";
 
 async fn interaction(
     shard_id: ShardId,
-    shard_manager: Arc<ShardManager>,
+    ShardManagerContainer(shard_manager): ShardManagerContainer,
     http: HttpType,
     interaction: CommandInteraction,
 ) -> CommandResult {
@@ -58,7 +61,7 @@ async fn interaction(
 
 async fn legacy(
     shard_id: ShardId,
-    shard_manager: Arc<ShardManager>,
+    ShardManagerContainer(shard_manager): ShardManagerContainer,
     http: HttpType,
     msg: Message,
 ) -> CommandResult {

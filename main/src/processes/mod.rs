@@ -5,10 +5,13 @@ use framework::{
 };
 use serenity::Client;
 
-use crate::{processes::socials::YoutubeProcess, websocket::SocketReceiveEvent};
+use crate::websocket::SocketReceiveEvent;
 
 mod backend;
 mod socials;
+
+use backend::ShardUpdater;
+use socials::YoutubeProcess;
 
 pub async fn start_background_processes(
     client: &Client,
@@ -19,6 +22,7 @@ pub async fn start_background_processes(
     manager.register_process(Cooldowns::default());
     manager.register_process(Ephemerals::default());
     manager.register_process(YoutubeProcess::default());
+    manager.register_process(ShardUpdater::default());
     // manager.register_process(process);
     manager.init_loop().await;
     client

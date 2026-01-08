@@ -18,7 +18,7 @@ mod websocket;
 
 #[tokio::main]
 async fn main() {
-    let shards = 1;
+    let shards = 3;
     let token = env!("TOKEN");
     let api_url = env!("BACKEND_URL");
     let bot_id = (env!("APPLICATION_ID")
@@ -32,7 +32,7 @@ async fn main() {
     let websocket = websocket::get_websocket_connection();
 
     let mut map = TypeMap::new();
-    set_global(&mut map);
+    set_global(shards, &mut map);
     set_sharded_data(shards, &mut map);
     set_sharded_cache(shards, &mut map);
     command_manager.set(&mut map);

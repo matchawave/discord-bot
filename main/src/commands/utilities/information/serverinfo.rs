@@ -2,6 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use framework::{
     command::{CommandCallbackType, CommandResult, ICommand},
+    extractors::ShardManagerContainer,
     guilds::Channels,
 };
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
@@ -23,7 +24,7 @@ pub fn command() -> ICommand {
 }
 
 async fn interaction(
-    shard_manager: Arc<ShardManager>,
+    ShardManagerContainer(shard_manager): ShardManagerContainer,
     shard_id: ShardId,
     guild: PartialGuild,
     channels: Channels,
@@ -35,7 +36,7 @@ async fn interaction(
 }
 
 async fn legacy(
-    shard_manager: Arc<ShardManager>,
+    ShardManagerContainer(shard_manager): ShardManagerContainer,
     shard_id: ShardId,
     guild: PartialGuild,
     channels: Channels,

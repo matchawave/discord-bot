@@ -122,7 +122,11 @@ where
                     debug!("({ws_text}) WebSocket writer stored in data");
                 }
                 reader::read_socket(reader, &self.callbacks, http.clone(), data.clone()).await;
-
+                {
+                    let mut data_write = data.write().await;
+                    data_write.remove::<writer::WebSocketWriter>();
+                    debug!("({ws_text}) WebSocket writer removed from data");
+                }
                 error!("({ws_text}) WebSocket connection closed, reconnecting...");
             } else {
                 error!("({ws_text}) Failed to connect, retrying in 5 seconds...");

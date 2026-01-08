@@ -37,7 +37,9 @@ impl MemberList {
     pub async fn get(&self, user_id: UserId) -> Option<MemberData> {
         (self.0.read().await).get(&user_id).cloned()
     }
-
+    /// Counts the number of human and bot members in the member list.
+    ///
+    /// Returns a tuple containing the count of human members and bot members.
     pub async fn count(&self) -> (usize, usize) {
         (self.0.read().await.par_iter())
             .fold(
