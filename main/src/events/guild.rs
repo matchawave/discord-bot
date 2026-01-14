@@ -21,6 +21,8 @@ pub async fn create(guild: PartialGuild, guild_map: GuildMap) {
     map_write.insert::<ReactionSnipes>(ReactionSnipes::default().0);
 }
 
+// pub async fn
+
 pub async fn update(guild: PartialGuild, guilds: Guilds) {
     if let Some(old_guild_ptr) = guilds.get_ptr::<PartialGuild>(guild.id).await {
         let old_guild = old_guild_ptr.make_clone().await;

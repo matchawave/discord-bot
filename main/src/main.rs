@@ -5,13 +5,19 @@ use serenity::{
     prelude::TypeMap,
 };
 
-use crate::{cache::set_sharded_cache, data::set_sharded_data, global::set_global};
+use crate::{
+    cache::set_sharded_cache,
+    data::set_sharded_data,
+    global::{
+        backend_http::{self, BackendHttp},
+        set_global,
+    },
+};
 mod cache;
 mod commands;
 mod configs;
 mod data;
 mod events;
-mod extractors;
 mod global;
 mod processes;
 mod websocket;
@@ -30,9 +36,10 @@ async fn main() {
     let event_handler = events::create_event_handler(shards);
     let command_manager = commands::create_command_handler();
     let websocket = websocket::get_websocket_connection();
+    let backend_http = BackendHttp::new(token, api_url);
 
     let mut map = TypeMap::new();
-    set_global(shards, &mut map);
+    set_global(shards, backend_http, &mut map);
     set_sharded_data(shards, &mut map);
     set_sharded_cache(shards, &mut map);
     command_manager.set(&mut map);

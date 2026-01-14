@@ -9,10 +9,10 @@ use crate::extractors::Extractor;
 #[async_trait]
 impl Extractor<Event> for Guild {
     async fn extract(_ctx: &Context, ev: &Event, _p: &Pointer<Parser>) -> Option<Self> {
-        match ev {
-            Event::GuildCreate(guild_create) => Some(guild_create.guild.clone()),
-            _ => None,
-        }
+        let Event::GuildCreate(guild_create) = ev else {
+            return None;
+        };
+        Some(guild_create.guild.clone())
     }
 }
 
