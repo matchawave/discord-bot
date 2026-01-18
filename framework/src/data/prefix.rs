@@ -50,7 +50,7 @@ where
 #[async_trait]
 impl ContextExtractor for DefaultPrefix {
     async fn extract_context(ctx: &Context) -> Option<Self> {
-        let shard_data = ShardData::get(ctx).await?;
+        let shard_data = ShardData::get(ctx.shard_id, &ctx.data).await?;
         Some(Self(shard_data.default_prefix.clone()))
     }
 }

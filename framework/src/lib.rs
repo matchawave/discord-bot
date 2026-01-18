@@ -8,17 +8,20 @@ pub mod processes;
 pub mod websocket;
 
 pub use macros::*;
-use utils::Pointer;
+use utils::{DataType, Pointer};
 
 use std::sync::Arc;
 
 use serenity::{
-    all::{Context, User},
+    all::{Context, ShardId, User},
     async_trait,
     prelude::{TypeMap, TypeMapKey},
 };
 
-use crate::guilds::Guilds;
+use crate::{
+    extractors::{ContextEventExtractor, ContextExtractor, Extractor},
+    guilds::Guilds,
+};
 
 pub trait Extractable {
     fn init(map: &mut TypeMap);
@@ -108,19 +111,36 @@ impl TypeMapKey for ShardData {
 }
 
 impl ShardData {
-    pub fn init(shards: usize, map: &mut TypeMap) {
-        let mut data = Vec::with_capacity(shards);
+    pub fn init(shards: usize, data: &mut TypeMap) {
+        let mut data_vec = Vec::with_capacity(shards);
         for _ in 0..shards {
-            data.push(ShardData::default());
+            data_vec.push(ShardData::default());
         }
-        map.insert::<ShardData>(Pointer::new(data));
+        data.insert::<ShardData>(Pointer::new(data_vec));
     }
 
-    pub async fn get(ctx: &Context) -> Option<ShardData> {
-        let data = ctx.data.read().await;
+    pub async fn get(shard_id: ShardId, data: &DataType) -> Option<ShardData> {
+        let data = data.read().await;
         let data = data.get::<ShardData>()?;
-        let shard_id = ctx.shard_id.get() as usize;
+        let shard_id = shard_id.get() as usize;
 
         data.read().await.get(shard_id).cloned()
+    }
+}
+
+#[async_trait]
+impl ContextExtractor for ShardData {
+    async fn extract_context(ctx: &Context) -> Option<Self> {
+        ShardData::get(ctx.shard_id, &ctx.data).await
+    }
+}
+
+#[async_trait]
+impl<T> Extractor<T> for ShardData
+where
+    T: Send + Sync + 'static,
+{
+    async fn extract(ctx: &Context, _: &T, _: &Pointer<utils::Parser>) -> Option<Self> {
+        ShardData::extract_context(ctx).await
     }
 }

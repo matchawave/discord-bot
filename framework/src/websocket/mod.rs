@@ -4,7 +4,6 @@ mod misc;
 mod reader;
 mod writer;
 
-pub use misc::*;
 use serde::de::DeserializeOwned;
 pub use writer::WebSocketWriter;
 

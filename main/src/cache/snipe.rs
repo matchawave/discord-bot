@@ -1,6 +1,6 @@
 use framework::{
     CacheExtractable, Extractable,
-    extractors::{ContextEventExtractor, EventExtractor, Extractor},
+    extractors::{ContextEventExtractor, ContextExtractor, EventExtractor, Extractor},
 };
 use moka::future::Cache;
 use serenity::{
@@ -28,7 +28,7 @@ macro_rules! snipe_builder {
                     ctx: &serenity::all::Context,
                     ev: &T,
                 ) -> Option<Self> {
-                    let data = framework::ShardData::get(ctx).await?;
+                    let data = framework::ShardData::extract_context(&ctx).await?;
                     let guild_id = GuildId::extract_event(ev).await?;
                     let guild_data = data.guilds.map(guild_id).await?;
                     (guild_data.read().await.get::<$name>())

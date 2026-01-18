@@ -1,21 +1,15 @@
-use std::{
-    collections::HashMap,
-    sync::{Arc, RwLock},
-};
+use std::collections::HashMap;
 
-use framework::{
-    build_process,
-    extractors::ContextExtractor,
-    processes::{ProcessLoop, ProcessManager},
-};
-use serenity::{all::ShardId, async_trait};
+use framework::{build_process, processes::ProcessLoop};
+use serenity::async_trait;
 
 build_process!(YoutubeProcess, HashMap<String, String>);
 
 #[async_trait]
 impl ProcessLoop for YoutubeProcess {
-    async fn process(&self, http: utils::HttpType, data: utils::DataType) {
-        loop {}
-        // Your YouTube processing logic here
+    async fn process(&self, _http: utils::HttpType, _data: utils::DataType) {
+        loop {
+            // Your YouTube processing logic here
+        }
     }
 }

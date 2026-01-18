@@ -1,18 +1,14 @@
-use framework::extractors::ShardManagerContainer;
+use std::sync::Arc;
+
+use framework::{ShardData, extractors::ShardManagerContainer};
 use serenity::{
     Client,
-    all::{ApplicationId, ClientBuilder, GatewayIntents, Http},
+    all::{ApplicationId, ClientBuilder, GatewayIntents, Http, ShardManager},
     prelude::TypeMap,
 };
+use utils::{DataType, error};
 
-use crate::{
-    cache::set_sharded_cache,
-    data::set_sharded_data,
-    global::{
-        backend_http::{self, BackendHttp},
-        set_global,
-    },
-};
+use crate::global::{backend_http::BackendHttp, set_global};
 mod cache;
 mod commands;
 mod configs;
@@ -27,39 +23,44 @@ async fn main() {
     let shards = 3;
     let token = env!("TOKEN");
     let api_url = env!("BACKEND_URL");
-    let bot_id = (env!("APPLICATION_ID")
-        .parse::<u64>()
-        .map(ApplicationId::new))
-    .unwrap();
+    let bot_id = get_bot_id();
+    let bot_intent = get_guild_intents();
 
     let http = Http::new(token);
-    let event_handler = events::create_event_handler(shards);
-    let command_manager = commands::create_command_handler();
-    let websocket = websocket::get_websocket_connection();
-    let backend_http = BackendHttp::new(token, api_url);
+    let mut data = TypeMap::new();
 
-    let mut map = TypeMap::new();
-    set_global(shards, backend_http, &mut map);
-    set_sharded_data(shards, &mut map);
-    set_sharded_cache(shards, &mut map);
-    command_manager.set(&mut map);
+    let event_handler = events::create_event_handler(shards); // Create the event handler for the bot
+    let command_manager = commands::create_command_handler(); // Command manager for registering and handling commands
+    let backend_http = BackendHttp::new(token, api_url); // This is for communicating with the backend server
+    backend_http.set_shards(shards as u32).await; // Set the number of shards in the backend
+    let websocket = websocket::get_websocket_connection().build(api_url, bot_id, token); // WebSocket connection to the backend
+    let process_manager = processes::get_bg_process_manager(&mut data, websocket).await; // Background process manager
 
-    let client_builder = ClientBuilder::new_with_http(http, get_guild_intents())
+    set_global(backend_http, &mut data);
+    ShardData::init(shards, &mut data);
+    command_manager.set(&mut data);
+
+    let client_builder = ClientBuilder::new_with_http(http, bot_intent)
         .application_id(bot_id)
-        .type_map(map)
+        .type_map(data)
         .raw_event_handler(event_handler);
 
-    match client_builder.await {
-        Ok(mut client) => {
-            command_manager.register(&client, false).await;
-            set_shard_manager(&client).await;
-            let websocket = websocket.build(api_url, bot_id, token);
-            processes::start_background_processes(&client, websocket).await;
-            if let Err(e) = client.start_shards(shards as u32).await {
-                println!("Error starting client: {:?}", e);
-            }
+    let mut client = match client_builder.await {
+        Ok(c) => {
+            set_shard_manager(&c).await;
+            c
         }
-        Err(e) => println!("Error starting client: {:?}", e),
+        Err(e) => {
+            error!("Error creating client: {:?}", e);
+            return;
+        }
+    };
+
+    process_manager.init_loop(&client.http, &client.data);
+    command_manager.register(&client.http, false).await;
+
+    if let Err(e) = client.start_shards(shards as u32).await {
+        error!("Error starting client: {:?}", e);
     }
 }
 
@@ -80,6 +81,13 @@ fn get_guild_intents() -> GatewayIntents {
 }
 
 async fn set_shard_manager(client: &Client) {
-    let mut data = client.data.write().await;
-    data.insert::<ShardManagerContainer>(client.shard_manager.clone());
+    let data = client.data.clone();
+    (data.write().await).insert::<ShardManagerContainer>(client.shard_manager.clone());
+}
+
+fn get_bot_id() -> ApplicationId {
+    env!("APPLICATION_ID")
+        .parse::<u64>()
+        .map(ApplicationId::new)
+        .unwrap()
 }

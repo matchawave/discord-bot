@@ -30,7 +30,7 @@ where
     GuildId: EventExtractor<T>,
 {
     async fn extract_context_event(ctx: &Context, ev: &T) -> Option<Self> {
-        let data = ShardData::get(ctx).await?;
+        let data = ShardData::get(ctx.shard_id, &ctx.data).await?;
         let guild_id = GuildId::extract_event(ev).await?;
         match data
             .guilds
@@ -162,7 +162,7 @@ where
     GuildId: EventExtractor<T>,
 {
     async fn extract_context_event(ctx: &Context, ev: &T) -> Option<Self> {
-        let data = ShardData::get(ctx).await?;
+        let data = ShardData::get(ctx.shard_id, &ctx.data).await?;
         let guild_id = GuildId::extract_event(ev).await?;
         data.guilds
             .get::<ChannelMembers, HashMap<ChannelId, Pointer<Vec<UserId>>>>(guild_id)

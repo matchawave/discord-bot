@@ -3,15 +3,12 @@ use std::fmt::Display;
 use framework::guilds::{GuildMap, Guilds};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serenity::all::{
-    AfkMetadata, ChannelId, Guild, ImageHash, NsfwLevel, PartialGuild, PremiumTier,
-    UnavailableGuild, UserId, VerificationLevel,
+    AfkMetadata, ChannelId, ImageHash, NsfwLevel, PartialGuild, PremiumTier, UnavailableGuild,
+    UserId, VerificationLevel,
 };
 use utils::info;
 
-use crate::{
-    cache::snipe::{EditSnipes, ReactionSnipes, Snipes},
-    global::shard_list::ShardData,
-};
+use crate::cache::snipe::{EditSnipes, ReactionSnipes, Snipes};
 
 pub async fn create(guild: PartialGuild, guild_map: GuildMap) {
     info!("Joined guild {} ({})", guild.name, guild.id);
@@ -34,11 +31,7 @@ pub async fn update(guild: PartialGuild, guilds: Guilds) {
     }
 }
 
-pub async fn delete(
-    unavailable_guild: UnavailableGuild,
-    guild: PartialGuild,
-    shard_data: ShardData,
-) {
+pub async fn delete(unavailable_guild: UnavailableGuild, guild: PartialGuild) {
     if unavailable_guild.unavailable {
         info!(
             "Guild {} ({}) got deleted (unavailable)",
@@ -47,7 +40,6 @@ pub async fn delete(
     } else {
         info!("Guild {} ({}) got deleted", guild.name, guild.id);
     }
-    shard_data.remove_server(guild.id).await;
 }
 
 enum GuildChange {

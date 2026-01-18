@@ -8,7 +8,7 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serenity::{
     all::{Context, GuildId, Member, UserId},
     async_trait,
-    prelude::TypeMapKey,
+    prelude::{TypeMap, TypeMapKey},
 };
 use utils::{MemberData, Parser, Pointer, error};
 
@@ -70,6 +70,17 @@ impl MemberList {
         }
         output
     }
+
+    pub async fn extract_from_guild(guilds: &Guilds, guild_id: GuildId) -> Option<Self> {
+        let guild_map = guilds.get::<MemberList, MemberMap>(guild_id).await?;
+        Some(MemberList(guild_map))
+    }
+
+    pub async fn from_map(map: &Pointer<TypeMap>) -> Option<Self> {
+        let type_map = map.read().await;
+        let member_map = type_map.get::<MemberList>()?;
+        Some(MemberList(member_map.clone()))
+    }
 }
 
 impl TypeMapKey for MemberList {
@@ -86,11 +97,7 @@ where
         let guild_id = GuildId::extract_event(ev).await?;
         let guilds = Guilds::extract_context(ctx).await?;
 
-        match guilds
-            .get::<MemberList, MemberMap>(guild_id)
-            .await
-            .map(Self)
-        {
+        match Self::extract_from_guild(&guilds, guild_id).await {
             Some(members) => Some(members),
             None => {
                 let ptr = guilds

@@ -4,15 +4,9 @@ use serenity::{
 };
 use utils::{HttpType, error, info};
 
-use crate::{data::member_list::MemberList, global::shard_list::ShardData};
+use crate::data::member_list::MemberList;
 
-pub async fn get_members(
-    guild_id: GuildId,
-    members_list: MemberList,
-    http: HttpType,
-    shard_data: ShardData,
-) {
-    shard_data.add_server(guild_id).await;
+pub async fn get_members(guild_id: GuildId, members_list: MemberList, http: HttpType) {
     tokio::spawn(async move {
         let mut members = guild_id.members_iter(http).boxed();
         info!("Fetching members for guild {}...", guild_id);
@@ -21,7 +15,6 @@ pub async fn get_members(
             match member_res {
                 Ok(member) => {
                     members_list.insert(&member).await;
-                    shard_data.add_member(1).await;
                     total += 1;
                 }
                 Err(err) => {
@@ -33,12 +26,10 @@ pub async fn get_members(
     });
 }
 
-pub async fn add_member(member: Member, members_list: MemberList, shard_data: ShardData) {
+pub async fn add_member(member: Member, members_list: MemberList) {
     members_list.insert(&member).await;
-    shard_data.add_member(1).await;
 }
 
-pub async fn subtract_member(member: Member, members_list: MemberList, shard_data: ShardData) {
+pub async fn subtract_member(member: Member, members_list: MemberList) {
     members_list.remove(member.user.id).await;
-    shard_data.remove_member(1).await;
 }

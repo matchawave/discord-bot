@@ -215,6 +215,10 @@ impl Guilds {
         error!("Tried to access non-existing guild data map: {}", guild_id);
         None
     }
+
+    pub fn ptr(&self) -> Pointer<HashMap<GuildId, GuildMap>> {
+        self.0.clone()
+    }
 }
 
 impl TypeMapKey for Guilds {
@@ -224,7 +228,7 @@ impl TypeMapKey for Guilds {
 #[async_trait]
 impl ContextExtractor for Guilds {
     async fn extract_context(ctx: &Context) -> Option<Self> {
-        let shard_data = ShardData::get(ctx).await?;
+        let shard_data = ShardData::get(ctx.shard_id, &ctx.data).await?;
         Some(shard_data.guilds)
     }
 }

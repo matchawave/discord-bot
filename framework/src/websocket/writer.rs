@@ -1,11 +1,8 @@
 use std::sync::Arc;
 
-use crate::{
-    extractors::{ContextExtractor, Extractor},
-    websocket::WsEnvelope,
-};
+use crate::extractors::{ContextExtractor, Extractor};
 
-use super::WebSocketStreamType;
+use super::{WebSocketStreamType, misc::WsEnvelope};
 use colored::Colorize;
 use serde::Serialize;
 use serenity::{

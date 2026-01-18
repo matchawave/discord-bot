@@ -13,7 +13,6 @@ use std::{
 };
 
 use serenity::{
-    Client,
     all::{
         Colour, CommandInteraction, Context, CreateCommand, CreateEmbed, CreateInteractionResponse,
         CreateMessage, GuildId, Mentionable, Message, PartialGuild,
@@ -67,13 +66,12 @@ impl CommandManager {
         data.insert::<Commands>(self.clone());
     }
 
-    pub async fn register(&self, client: &Client, should_delete: bool) {
-        let http = &client.http;
+    pub async fn register(&self, http: &HttpType, should_delete: bool) {
         let timer = ElapsedTime::new();
         let mut commands: Vec<CreateCommand> = Vec::new();
-        for cmd in self.0.values() {
-            let res: Result<Vec<CreateCommand>, _> = cmd.try_into();
-            if let Ok(create_cmds) = res {
+        for command in self.0.values() {
+            let result: Result<Vec<CreateCommand>, _> = command.try_into();
+            if let Ok(create_cmds) = result {
                 commands.extend(create_cmds);
             }
         }

@@ -17,7 +17,7 @@ pub async fn update(ctx: &Context, new: &VoiceState) {
         return;
     };
 
-    let Some(shard_data) = ShardData::get(ctx).await else {
+    let Some(shard_data) = ShardData::get(ctx.shard_id, &ctx.data).await else {
         error!(
             "{} {} Could not get shard data for voice state update in guild {} for user {}",
             shard_text, seperator, guild_id, new.user_id

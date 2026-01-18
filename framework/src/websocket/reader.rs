@@ -6,7 +6,7 @@ use serenity::futures::{StreamExt, stream::SplitStream};
 use tokio_tungstenite::tungstenite::Message;
 use utils::{DataType, HttpType, error, info};
 
-use super::{EventCallback, WebSocketStreamType, WsEnvelope};
+use super::{EventCallback, WebSocketStreamType, misc::WsEnvelope};
 
 pub(super) type SocketReader = SplitStream<WebSocketStreamType>;
 
@@ -57,7 +57,7 @@ pub(super) async fn read_socket<T>(
                 info!("({ws_text}) WebSocket closed without close frame");
                 break; // Exit the read loop on close
             }
-            Ok(Message::Pong(bytes)) => {}
+            Ok(Message::Pong(_bytes)) => {}
             Ok(_) => {} // This message type is not handled
             Err(e) => {
                 error!("({ws_text}) Error receiving message: {:?}", e);
