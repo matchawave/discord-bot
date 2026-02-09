@@ -3,19 +3,29 @@ use std::fmt::Display;
 use framework::guilds::{GuildMap, Guilds};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serenity::all::{
-    AfkMetadata, ChannelId, ImageHash, NsfwLevel, PartialGuild, PremiumTier, UnavailableGuild,
-    UserId, VerificationLevel,
+    AfkMetadata, ChannelId, ImageHash, NsfwLevel, PartialGuild, PremiumTier, ShardId,
+    UnavailableGuild, UserId, VerificationLevel,
 };
 use utils::info;
 
-use crate::cache::snipe::{EditSnipes, ReactionSnipes, Snipes};
+use crate::{
+    cache::snipe::{EditSnipes, ReactionSnipes, Snipes},
+    global::backend_http::{self, BackendHttp},
+};
 
-pub async fn create(guild: PartialGuild, guild_map: GuildMap) {
+pub async fn create(
+    shard_id: ShardId,
+    guild: PartialGuild,
+    guild_map: GuildMap,
+    backend_http: BackendHttp,
+) {
     info!("Joined guild {} ({})", guild.name, guild.id);
     let mut map_write = guild_map.write().await;
     map_write.insert::<Snipes>(Snipes::default().0);
     map_write.insert::<EditSnipes>(EditSnipes::default().0);
     map_write.insert::<ReactionSnipes>(ReactionSnipes::default().0);
+
+    backend_http.register_guild(guild.id, shard_id).await;
 }
 
 // pub async fn
@@ -31,14 +41,17 @@ pub async fn update(guild: PartialGuild, guilds: Guilds) {
     }
 }
 
-pub async fn delete(unavailable_guild: UnavailableGuild, guild: PartialGuild) {
+pub async fn delete(
+    unavailable_guild: UnavailableGuild,
+    guild: PartialGuild,
+    backend_http: BackendHttp,
+) {
     if unavailable_guild.unavailable {
-        info!(
-            "Guild {} ({}) got deleted (unavailable)",
-            guild.name, guild.id
-        );
-    } else {
         info!("Guild {} ({}) got deleted", guild.name, guild.id);
+        backend_http.delete_guild(guild.id).await;
+    } else {
+        info!("Bot got removed from guild {} ({})", guild.name, guild.id);
+        backend_http.disable_guild(guild.id).await;
     }
 }
 

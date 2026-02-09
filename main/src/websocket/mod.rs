@@ -13,21 +13,23 @@ pub fn get_websocket_connection() -> WebSocketProcessorBuilder<SocketReceiveEven
 }
 
 async fn handle_ready(_: (), data: DataType, _: HttpType) {
-    let ping = PingPayload {
-        timestamp: chrono::Utc::now().timestamp_millis(),
-        avg_ping: None,
-    };
-    if let Some(writer) = WebSocketWriter::get(&data).await
-        && let Err(e) = writer.send(SocketSendEvent::BotPing, ping).await
-    {
-        error!("Error sending initial ping: {}", e);
+    if let Some(writer) = WebSocketWriter::get(&data).await {
+        let ping = PingPayload {
+            timestamp: chrono::Utc::now().timestamp_millis(),
+            avg_ping: None,
+        };
+        let shards = ping::get_shards(&data).await;
+        let response = ping::ShardPingPayload { ping, shards };
+
+        if let Err(e) = writer.send(SocketSendEvent::BotUpdate, response).await {
+            error!("Error sending initial ping: {}", e);
+        }
     }
 }
 
 #[derive(Hash, Eq, PartialEq, Serialize)]
 pub enum SocketSendEvent {
-    BotPing,
-    ShardUpdate,
+    BotUpdate,
 }
 
 #[derive(Hash, Eq, PartialEq, Deserialize, Default)]

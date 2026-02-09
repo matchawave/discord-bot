@@ -3,7 +3,10 @@ use std::sync::Arc;
 use framework::extractors::{ContextExtractor, Extractor};
 use reqwest::{Client, ClientBuilder, header::HeaderMap};
 use serde::{Serialize, de::DeserializeOwned};
-use serenity::{all::Context, async_trait};
+use serenity::{
+    all::{Context, GuildId, ShardId},
+    async_trait,
+};
 use utils::{Pointer, error, info};
 
 const PROTOCOL: &str = "http";
@@ -124,6 +127,64 @@ impl BackendHttp {
             }
             Err(e) => {
                 error!("Error setting shards at {}: {:?}", link, e);
+            }
+        }
+    }
+
+    pub async fn register_guild(&self, guild_id: GuildId, shard_id: ShardId) {
+        let path = format!("api/guild/{}?shard_id={}", guild_id, shard_id);
+        let link = self.get_link(&path);
+
+        match self.client.post(&link).send().await {
+            Ok(r) => {
+                if r.status().is_server_error() || r.status().is_client_error() {
+                    error!("Registering guild at {}: {:?}", link, r.status());
+                } else {
+                    info!(
+                        "Successfully registered guild at {}: {:?}",
+                        link,
+                        r.status()
+                    );
+                }
+            }
+            Err(e) => {
+                error!("Error registering guild at {}: {:?}", link, e);
+            }
+        }
+    }
+
+    pub async fn disable_guild(&self, guild_id: GuildId) {
+        let path = format!("api/guild/{}", guild_id);
+        let link = self.get_link(&path);
+
+        match self.client.delete(&link).send().await {
+            Ok(r) => {
+                if r.status().is_server_error() || r.status().is_client_error() {
+                    error!("Disabling guild at {}: {:?}", link, r.status());
+                } else {
+                    info!("Successfully disabled guild at {}: {:?}", link, r.status());
+                }
+            }
+            Err(e) => {
+                error!("Error disabling guild at {}: {:?}", link, e);
+            }
+        }
+    }
+
+    pub async fn delete_guild(&self, guild_id: GuildId) {
+        let path = format!("api/guilds/{}", guild_id);
+        let link = self.get_link(&path);
+
+        match self.client.delete(&link).send().await {
+            Ok(r) => {
+                if r.status().is_server_error() || r.status().is_client_error() {
+                    error!("Deleting guild at {}: {:?}", link, r.status());
+                } else {
+                    info!("Successfully deleted guild at {}: {:?}", link, r.status());
+                }
+            }
+            Err(e) => {
+                error!("Error deleting guild at {}: {:?}", link, e);
             }
         }
     }
