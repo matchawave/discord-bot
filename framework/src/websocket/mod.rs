@@ -111,10 +111,11 @@ where
         // Here you would implement the WebSocket connection logic
         let ws_text = "websocket".yellow();
         info!("({ws_text}) Starting WebSocket connection");
-
+        let mut printed_reconnection = false;
         loop {
             if let Some((writer, reader)) = self.connect().await {
                 let data = data.clone();
+                printed_reconnection = false;
                 {
                     let mut data_write = data.write().await;
                     data_write.insert::<writer::WebSocketWriter>(Arc::new(Mutex::new(writer)));
@@ -128,7 +129,10 @@ where
                 }
                 error!("({ws_text}) WebSocket connection closed, reconnecting...");
             } else {
-                error!("({ws_text}) Failed to connect, retrying in 5 seconds...");
+                if !printed_reconnection {
+                    printed_reconnection = true;
+                    error!("({ws_text}) Failed to connect, retrying in 5 seconds...");
+                }
                 tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
             }
         }

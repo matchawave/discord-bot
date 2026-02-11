@@ -3,7 +3,7 @@ use std::{sync::Arc, time::Instant};
 use framework::{
     data::{Cooldown, Cooldowns},
     extractors::CurrentBot,
-    global::GlobalMap,
+    global::GlobalCache,
     guilds::{ChannelMembers, Channels, HTTPGetter, VoiceStates},
 };
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator};
@@ -167,7 +167,7 @@ pub async fn create(
     new: VoiceState,
     voice_master: VoiceMaster,
     channels: Channels,
-    configs: GlobalMap<VoiceConfig>,
+    configs: GlobalCache<VoiceConfig>,
     cooldowns: Arc<Cooldowns>,
     parser: Pointer<Parser>,
 ) {

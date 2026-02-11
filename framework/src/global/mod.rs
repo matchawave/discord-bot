@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 
 use crate::{
     command::CommandManager,
@@ -23,9 +23,23 @@ pub enum UserGlobalType {
     User(UserId),
 }
 
-impl<V> Default for GlobalMap<V>
+#[derive(Debug)]
+pub struct GlobalCache<V>(Cache<UserGlobalType, Pointer<V>>)
 where
-    V: Clone + Send + Sync + 'static,
+    V: Send + Sync + 'static;
+
+impl<V> Clone for GlobalCache<V>
+where
+    V: Send + Sync + 'static,
+{
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl<V> Default for GlobalCache<V>
+where
+    V: Send + Sync + 'static,
 {
     fn default() -> Self {
         Self(
@@ -37,14 +51,9 @@ where
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct GlobalMap<V>(Cache<UserGlobalType, Pointer<V>>)
+impl<V> GlobalCache<V>
 where
-    V: Clone + Send + Sync + 'static;
-
-impl<V> GlobalMap<V>
-where
-    V: Clone + Send + Sync + 'static,
+    V: Send + Sync + 'static,
 {
     pub async fn get(&self, guild_id: GuildId, user_id: UserId) -> Option<Pointer<V>> {
         match self.0.get(&UserGlobalType::Guild(guild_id, user_id)).await {
@@ -53,29 +62,86 @@ where
         }
     }
 
-    pub async fn get_cloned(&self, guild_id: GuildId, user_id: UserId) -> Option<V> {
-        match self.get(guild_id, user_id).await {
-            Some(value) => Some(value.make_clone().await),
-            None => None,
-        }
-    }
-
     pub async fn insert(&self, key: UserGlobalType, value: V) {
         self.0.insert(key, Pointer::new(value)).await;
     }
 }
 
+impl<V> TypeMapKey for GlobalCache<V>
+where
+    V: Send + Sync + 'static,
+{
+    type Value = GlobalCache<V>;
+}
+
+#[async_trait]
+impl<T, V> Extractor<T> for GlobalCache<V>
+where
+    V: Send + Sync + 'static,
+{
+    async fn extract(
+        ctx: &serenity::all::Context,
+        _: &T,
+        _: &utils::Pointer<utils::Parser>,
+    ) -> Option<Self> {
+        GlobalCache::<V>::extract_context(ctx).await
+    }
+}
+
+#[async_trait]
+impl<V> ContextExtractor for GlobalCache<V>
+where
+    V: Send + Sync + 'static,
+{
+    async fn extract_context(ctx: &serenity::all::Context) -> Option<Self> {
+        let data = ctx.data.read().await;
+        data.get::<GlobalCache<V>>().cloned()
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct GlobalMap<V>(Pointer<HashMap<UserGlobalType, Pointer<V>>>)
+where
+    V: Send + Sync + 'static;
+
 impl<V> TypeMapKey for GlobalMap<V>
 where
-    V: Clone + Send + Sync + 'static,
+    V: Send + Sync + 'static,
 {
     type Value = GlobalMap<V>;
+}
+
+impl<V> Clone for GlobalMap<V>
+where
+    V: Send + Sync + 'static,
+{
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl<V> GlobalMap<V>
+where
+    V: Send + Sync + 'static,
+{
+    pub async fn get(&self, guild_id: GuildId, user_id: UserId) -> Option<Pointer<V>> {
+        let map = self.0.read().await;
+        match map.get(&UserGlobalType::Guild(guild_id, user_id)) {
+            Some(value) => Some(value.clone()),
+            None => map.get(&UserGlobalType::User(user_id)).cloned(),
+        }
+    }
+
+    pub async fn insert(&self, key: UserGlobalType, value: V) {
+        let mut map = self.0.write().await;
+        map.insert(key, Pointer::new(value));
+    }
 }
 
 #[async_trait]
 impl<T, V> Extractor<T> for GlobalMap<V>
 where
-    V: Clone + Send + Sync + 'static,
+    V: Send + Sync + 'static,
 {
     async fn extract(
         ctx: &serenity::all::Context,
@@ -89,7 +155,7 @@ where
 #[async_trait]
 impl<V> ContextExtractor for GlobalMap<V>
 where
-    V: Clone + Send + Sync + 'static,
+    V: Send + Sync + 'static,
 {
     async fn extract_context(ctx: &serenity::all::Context) -> Option<Self> {
         let data = ctx.data.read().await;
