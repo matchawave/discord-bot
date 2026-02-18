@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use framework::command::{CommandCallbackType, CommandResult, ICommand};
+use framework::command::{CommandCallbackType as CCT, CommandResult, ICommand};
 use serenity::all::{CommandOptionType, CreateCommandOption};
 use utils::BotPermission;
 
@@ -12,10 +12,7 @@ pub fn command() -> ICommand {
     ICommand::new(NAME, DESCRIPTION)
         .options(vec![options])
         .permissions(vec![BotPermission::ManageGuild])
-        .callbacks(vec![
-            CommandCallbackType::slash(interaction),
-            CommandCallbackType::legacy(legacy),
-        ])
+        .callbacks(vec![CCT::slash(interaction), CCT::legacy(legacy)])
 }
 
 async fn interaction() -> CommandResult {

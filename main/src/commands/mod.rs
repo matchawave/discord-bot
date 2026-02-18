@@ -2,16 +2,18 @@ use framework::{
     command::{CommandManager, CommandManagerBuilder},
     guilds::{HTTPGetter, Members},
 };
-use serenity::all::{CreateEmbedAuthor, Member, User, UserId};
+use serenity::all::{Colour, CreateEmbed, CreateEmbedAuthor, Member, User, UserId};
 use utils::HttpType;
 mod configuration;
 mod example;
+mod miscellaneous;
 mod utilities;
 
 pub fn create_command_handler() -> CommandManager {
     CommandManagerBuilder::default()
         .add_commands(utilities::module())
         .add_commands(configuration::module())
+        .add_commands(miscellaneous::module())
         .build()
 }
 
@@ -34,4 +36,22 @@ pub async fn get_author_embed(
             .await
             .map(|author| author_embed(&author.user))
     }
+}
+
+#[macro_export]
+macro_rules! success {
+    ($user_id:expr, $($arg:tt)*) => {
+        {
+            use serenity::all::Mentionable;
+            let user_id = $user_id;
+            serenity::all::CreateEmbed::default()
+                .colour((39u8, 245u8, 132u8))
+                .description(format!("{}: {}", user_id.mention().to_string(), format!($($arg)*)))
+        }
+    };
+    ($($arg:tt)*) => {
+        serenity::all::CreateEmbed::default()
+            .colour((39u8, 245u8, 132u8))
+            .description(format!($($arg)*))
+    };
 }

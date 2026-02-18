@@ -1,5 +1,5 @@
 use framework::{
-    command::{CommandCallbackType, CommandResult, ICommand},
+    command::{CommandCallbackType as CCT, CommandResult, ICommand},
     data::{DefaultPrefix, Prefix},
     extractors::InteractionOptions,
 };
@@ -36,10 +36,7 @@ pub fn command() -> ICommand {
     ICommand::new(NAME, DESCRIPTION)
         .options(vec![set_options, remove_options, get_options])
         .permissions(vec![BotPermission::BotMaster])
-        .callbacks(vec![
-            CommandCallbackType::slash(interaction),
-            CommandCallbackType::legacy(legacy),
-        ])
+        .callbacks(vec![CCT::slash(interaction), CCT::legacy(legacy)])
 }
 
 async fn interaction(

@@ -1,5 +1,5 @@
 use framework::{
-    command::{CommandCallbackType, CommandResult, ICommand},
+    command::{CommandCallbackType as CCT, CommandResult, ICommand},
     extractors::InteractionOptions,
     guilds::{HTTPGetter, Members, Messages},
 };
@@ -26,10 +26,7 @@ pub fn command() -> ICommand {
     ICommand::new(NAME, DESCRIPTION)
         .options(vec![index_option])
         .permissions(vec![BotPermission::ManageMessages])
-        .callbacks(vec![
-            CommandCallbackType::slash(interaction),
-            CommandCallbackType::legacy(legacy),
-        ])
+        .callbacks(vec![CCT::slash(interaction), CCT::legacy(legacy)])
 }
 #[allow(clippy::too_many_arguments)]
 async fn interaction(

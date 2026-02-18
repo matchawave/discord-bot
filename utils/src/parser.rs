@@ -26,7 +26,7 @@ pub struct Parser {
     channels: Option<HashMap<ChannelId, GuildChannel>>,
     members: Option<HashMap<UserId, MemberData>>,
 
-    cache: DashMap<String, Option<String>>,
+    cache: HashMap<String, Option<String>>,
 }
 
 impl Parser {
@@ -38,7 +38,7 @@ impl Parser {
             member: None,
             channels: None,
             members: None,
-            cache: DashMap::new(),
+            cache: HashMap::new(),
         }
     }
 
@@ -315,11 +315,11 @@ impl Parser {
     }
 }
 pub trait Formatter {
-    fn format(&self, parser: &Parser) -> String;
+    fn format(&self, parser: &mut Parser) -> String;
 }
 
 impl Formatter for &str {
-    fn format(&self, parser: &Parser) -> String {
+    fn format(&self, parser: &mut Parser) -> String {
         let re = Regex::new(r"\{([^}]+)\}").unwrap();
         re.replace_all(self, |caps: &Captures| {
             let path = &caps[1];
@@ -361,7 +361,7 @@ impl Formatter for &str {
 }
 
 impl Formatter for String {
-    fn format(&self, parser: &Parser) -> Self {
+    fn format(&self, parser: &mut Parser) -> Self {
         self.as_str().format(parser)
     }
 }
@@ -400,4 +400,53 @@ fn channel_type(type_: ChannelType) -> String {
         _ => "Unknown",
     }
     .to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Formatter, NOT_AVAILABLE, Parser};
+    use serenity::all::ShardId;
+
+    fn new_parser() -> Parser {
+        Parser::new(ShardId(0))
+    }
+
+    #[test]
+    fn format_returns_input_without_placeholders() {
+        let mut parser = new_parser();
+        let input = "plain text";
+        assert_eq!(input.format(&mut parser), input);
+    }
+
+    #[test]
+    fn format_unknown_section_returns_not_available() {
+        let mut parser = new_parser();
+        let input = "Value: {unknown.key}";
+        let expected = format!("Value: {}", NOT_AVAILABLE);
+        assert_eq!(input.format(&mut parser), expected);
+    }
+
+    #[test]
+    fn format_missing_user_returns_not_available() {
+        let mut parser = new_parser();
+        let input = "{user.id}";
+        assert_eq!(input.format(&mut parser), NOT_AVAILABLE);
+    }
+
+    #[test]
+    fn format_multiple_unknown_placeholders() {
+        let mut parser = new_parser();
+        let input = "A {foo.bar} B {baz.qux}";
+        let expected = format!("A {} B {}", NOT_AVAILABLE, NOT_AVAILABLE);
+        assert_eq!(input.format(&mut parser), expected);
+    }
+
+    #[test]
+    fn format_time_now_text_is_non_empty() {
+        let mut parser = new_parser();
+        let output = "{time.now_text}".format(&mut parser);
+        assert!(!output.is_empty());
+        assert!(!output.contains('{'));
+        assert!(!output.contains('}'));
+    }
 }

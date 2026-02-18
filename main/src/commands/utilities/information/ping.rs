@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use framework::{
-    command::{CommandCallbackType, CommandResult, ICommand},
+    command::{CommandCallbackType as CCT, CommandResult, ICommand},
     extractors::ShardManagerContainer,
 };
 use serenity::all::{
@@ -17,10 +17,7 @@ pub fn command() -> ICommand {
     // let options = CreateCommandOption::new(CommandOptionType::String, "", "");
     ICommand::new(NAME, DESCRIPTION)
         .cooldown(3000)
-        .callbacks(vec![
-            CommandCallbackType::slash(interaction),
-            CommandCallbackType::legacy(legacy),
-        ])
+        .callbacks(vec![CCT::slash(interaction), CCT::legacy(legacy)])
 }
 
 const PING_RESPONSE_TEMPLATE: &str = "Pong! It took {time} to ping.";
