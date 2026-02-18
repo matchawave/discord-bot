@@ -12,15 +12,16 @@ use serenity::{
     async_trait,
 };
 use tokio::sync::mpsc::{self, Receiver, Sender};
-use utils::{DiscordEvent, ElapsedTime, Parser, Pointer, error, info};
+use utils::{DiscordEvent, ElapsedTime, Parser, Pointer, ResponseError, error, info, warning};
 
 use crate::{
-    HandlerFn,
-    extractors::{DynHandler, ExtractorTuple, HandlerBuilder},
+    extractors::ExtractorTuple,
+    handler::{CallbackReturn, DynCallback, HandlerBuilder, HandlerFn},
 };
 
-type EventCallback = Box<dyn DynHandler<Event, Output = ()> + Send + Sync>;
-type EventCallbacks = Vec<EventCallback>;
+pub type EventResult = Result<Option<()>, ResponseError>;
+
+type EventCallbacks = Vec<Box<dyn DynCallback<Event, EventResult> + Send + Sync>>;
 type CallbackMap = HashMap<DiscordEvent, EventCallbacks>;
 
 #[derive(Default)]
@@ -28,12 +29,13 @@ pub struct EventManagerBuilder(CallbackMap);
 
 impl EventManagerBuilder {
     #[warn(private_bounds)]
-    pub fn add_handler<F, Args>(mut self, event: DiscordEvent, callback: F) -> Self
+    pub fn add_handler<F, U, Args>(mut self, event: DiscordEvent, callback: F) -> Self
     where
-        F: HandlerFn<Args, ()> + Send + Sync + Copy + 'static,
+        F: HandlerFn<Args, U> + Send + Sync + Copy + 'static,
         Args: ExtractorTuple<Event> + Send + Sync + 'static,
+        U: CallbackReturn<EventResult> + 'static,
     {
-        let handler = HandlerBuilder::<Event, ()>::build(callback);
+        let handler = HandlerBuilder::<Event, U>::build(callback);
         self.0.entry(event).or_default().push(Box::new(handler));
         self
     }
@@ -96,7 +98,13 @@ async fn worker(mut receiver: Receiver<(Context, Event)>, callbacks: Arc<Callbac
             );
 
             for func in funcs.iter() {
-                func.call(&ctx, &event, &parser).await;
+                if let Some(Err(result)) = func.call(&ctx, &event, &parser).await {
+                    match result {
+                        ResponseError::Err(e) => error!("{event_name} event: {e}"),
+                        ResponseError::Warn(e) => warning!("{event_name} event: {e}"),
+                        ResponseError::Info(e) => info!("{event_name} event: {e}"),
+                    }
+                }
             }
 
             info!(
@@ -159,5 +167,17 @@ async fn delete_guilds(ctx: &Context, event: &Event) {
 async fn handle_voice_state_update(ctx: &Context, event: &Event) {
     if let Event::VoiceStateUpdate(e) = event {
         voice_states::update(ctx, &e.voice_state).await;
+    }
+}
+
+impl CallbackReturn<EventResult> for Result<(), ResponseError> {
+    fn into_response(self: Box<Self>) -> Option<EventResult> {
+        Some(self.map(|_| None))
+    }
+}
+
+impl CallbackReturn<EventResult> for EventResult {
+    fn into_response(self: Box<Self>) -> Option<EventResult> {
+        Some(*self)
     }
 }

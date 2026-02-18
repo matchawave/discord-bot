@@ -10,7 +10,7 @@ use serenity::{
     async_trait,
     prelude::TypeMapKey,
 };
-use utils::Pointer;
+use utils::{Pointer, error};
 
 pub struct Commands;
 impl TypeMapKey for Commands {
@@ -62,8 +62,10 @@ where
         }
     }
 
-    pub async fn insert(&self, key: UserGlobalType, value: V) {
-        self.0.insert(key, Pointer::new(value)).await;
+    pub async fn insert(&self, key: UserGlobalType, value: V) -> Pointer<V> {
+        let ptr: Pointer<V> = Pointer::new(value);
+        self.0.insert(key, ptr.clone()).await;
+        ptr
     }
 }
 
@@ -99,7 +101,7 @@ where
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct GlobalMap<V>(Pointer<HashMap<UserGlobalType, Pointer<V>>>)
 where
     V: Send + Sync + 'static;
@@ -132,9 +134,27 @@ where
         }
     }
 
-    pub async fn insert(&self, key: UserGlobalType, value: V) {
+    pub async fn insert(&self, key: UserGlobalType, value: V) -> Pointer<V> {
         let mut map = self.0.write().await;
-        map.insert(key, Pointer::new(value));
+        let ptr = Pointer::new(value);
+        map.insert(key, ptr.clone());
+        ptr
+    }
+
+    pub async fn remove(&self, guild_id: GuildId, user_id: UserId) -> Option<V> {
+        let mut map = self.0.write().await;
+        let ptr = match map.remove(&UserGlobalType::Guild(guild_id, user_id)) {
+            Some(value) => value,
+            None => map.remove(&UserGlobalType::User(user_id))?,
+        };
+
+        match ptr.inner() {
+            Ok(value) => Some(value),
+            Err(err) => {
+                error!("Failed to remove value from GlobalMap: {}", err);
+                None
+            }
+        }
     }
 }
 
@@ -160,5 +180,14 @@ where
     async fn extract_context(ctx: &serenity::all::Context) -> Option<Self> {
         let data = ctx.data.read().await;
         data.get::<GlobalMap<V>>().cloned()
+    }
+}
+
+impl<T> Default for GlobalMap<T>
+where
+    T: Send + Sync + 'static,
+{
+    fn default() -> Self {
+        Self(Pointer::new(HashMap::new()))
     }
 }

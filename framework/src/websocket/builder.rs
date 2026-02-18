@@ -2,7 +2,7 @@ use serde_json::Value;
 use serenity::async_trait;
 use utils::{DataType, HttpType, error};
 
-use crate::HandlerFn;
+use crate::handler::HandlerFn;
 
 pub(super) struct WSHandler<F, T>
 where

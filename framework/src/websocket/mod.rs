@@ -16,7 +16,7 @@ use tokio::{net::TcpStream, sync::Mutex};
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, tungstenite::ClientRequestBuilder};
 use utils::{DataType, HttpType, debug, error, info};
 
-use crate::{HandlerFn, processes::ProcessLoop};
+use crate::{handler::HandlerFn, processes::ProcessLoop};
 
 const PROTOCOL: &str = "ws";
 
@@ -70,7 +70,7 @@ impl<T> WebSocketProcessor<T>
 where
     T: DeserializeOwned + Eq + std::hash::Hash,
 {
-    async fn connect(&self) -> Option<(writer::SocketWriter, reader::SocketReader)> {
+    async fn connect(&self) -> Result<(writer::SocketWriter, reader::SocketReader), String> {
         let config = configs::create_config();
 
         let connector = configs::create_connector();
@@ -81,16 +81,9 @@ where
             false,
             Some(connector),
         );
-        let ws_text = "websocket".yellow();
         match connection.await {
-            Ok((ws_stream, _response)) => {
-                info!("({ws_text}) WebSocket connection established");
-                Some(ws_stream.split())
-            }
-            Err(e) => {
-                info!("({ws_text}) WebSocket connection error: {:?}", e);
-                None
-            }
+            Ok((ws_stream, _response)) => Ok(ws_stream.split()),
+            Err(e) => Err(format!("Failed to establish WebSocket connection: {:?}", e)),
         }
     }
 }
@@ -113,27 +106,33 @@ where
         info!("({ws_text}) Starting WebSocket connection");
         let mut printed_reconnection = false;
         loop {
-            if let Some((writer, reader)) = self.connect().await {
-                let data = data.clone();
-                printed_reconnection = false;
-                {
-                    let mut data_write = data.write().await;
-                    data_write.insert::<writer::WebSocketWriter>(Arc::new(Mutex::new(writer)));
-                    debug!("({ws_text}) WebSocket writer stored in data");
+            match self.connect().await {
+                Ok((writer, reader)) => {
+                    let data = data.clone();
+                    printed_reconnection = false;
+                    {
+                        let mut data_write = data.write().await;
+                        data_write.insert::<writer::WebSocketWriter>(Arc::new(Mutex::new(writer)));
+                        debug!("({ws_text}) WebSocket writer stored in data");
+                    }
+                    reader::read_socket(reader, &self.callbacks, http.clone(), data.clone()).await;
+                    {
+                        let mut data_write = data.write().await;
+                        data_write.remove::<writer::WebSocketWriter>();
+                        debug!("({ws_text}) WebSocket writer removed from data");
+                    }
+                    error!("({ws_text}) WebSocket connection closed, reconnecting...");
                 }
-                reader::read_socket(reader, &self.callbacks, http.clone(), data.clone()).await;
-                {
-                    let mut data_write = data.write().await;
-                    data_write.remove::<writer::WebSocketWriter>();
-                    debug!("({ws_text}) WebSocket writer removed from data");
+                Err(e) => {
+                    if !printed_reconnection {
+                        printed_reconnection = true;
+                        error!(
+                            "({ws_text}) Failed to connect, retrying in 5 seconds...\n{}",
+                            e
+                        );
+                    }
+                    tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
                 }
-                error!("({ws_text}) WebSocket connection closed, reconnecting...");
-            } else {
-                if !printed_reconnection {
-                    printed_reconnection = true;
-                    error!("({ws_text}) Failed to connect, retrying in 5 seconds...");
-                }
-                tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
             }
         }
     }

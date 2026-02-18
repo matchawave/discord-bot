@@ -14,8 +14,6 @@ pub use shard_manager::*;
 use serenity::{all::Context, async_trait};
 use utils::{Parser, Pointer};
 
-use crate::HandlerFn;
-
 #[async_trait]
 pub trait Extractor<T>: Sized + Send + Sync + 'static {
     async fn extract(ctx: &Context, ev: &T, p: &Pointer<Parser>) -> Option<Self>;
@@ -50,70 +48,6 @@ pub trait ContextEventExtractor<T>: Sized + Send + Sync + 'static {
 #[async_trait]
 pub trait ExtractorTuple<T>: Sized {
     async fn extract_tuple(ctx: &Context, action: &T, p: &Pointer<Parser>) -> Option<Self>;
-}
-
-pub(crate) struct Handler<T, U, F, Args>
-where
-    T: Send + Sync + 'static,
-    U: Send + Sync + 'static,
-    F: HandlerFn<Args, U> + Send + Sync + Copy + 'static,
-    Args: ExtractorTuple<T> + Send + Sync + 'static,
-{
-    callback: F,
-    _type: std::marker::PhantomData<T>,
-    _return: std::marker::PhantomData<U>,
-    _args: std::marker::PhantomData<Args>,
-}
-
-pub(crate) struct HandlerBuilder<T, U>
-where
-    T: Send + Sync + 'static,
-    U: Send + Sync + 'static,
-{
-    _type: std::marker::PhantomData<T>,
-    _return: std::marker::PhantomData<U>,
-}
-
-impl<T, U> HandlerBuilder<T, U>
-where
-    T: Send + Sync + 'static,
-    U: Send + Sync + 'static,
-{
-    pub fn build<F, Args>(callback: F) -> Handler<T, U, F, Args>
-    where
-        F: HandlerFn<Args, U> + Send + Sync + Copy + 'static,
-        Args: ExtractorTuple<T> + Send + Sync + 'static,
-    {
-        Handler {
-            callback,
-            _type: std::marker::PhantomData,
-            _return: std::marker::PhantomData,
-            _args: std::marker::PhantomData,
-        }
-    }
-}
-
-#[async_trait]
-pub trait DynHandler<T>: Send + Sync {
-    type Output: Send + Sync;
-    async fn call(&self, ctx: &Context, ev: &T, p: &Pointer<Parser>) -> Option<Self::Output>;
-}
-
-#[async_trait]
-impl<T, U, F, Args> DynHandler<T> for Handler<T, U, F, Args>
-where
-    T: Send + Sync + 'static,
-    U: Send + Sync + 'static,
-    F: HandlerFn<Args, U> + Send + Sync + Copy + 'static,
-    Args: ExtractorTuple<T> + Send + Sync + 'static,
-{
-    type Output = U;
-    async fn call(&self, ctx: &Context, ev: &T, p: &Pointer<Parser>) -> Option<U> {
-        if let Some(args) = Args::extract_tuple(ctx, ev, p).await {
-            return Some(self.callback.call(args).await);
-        }
-        None
-    }
 }
 
 macro_rules! impl_from_request_tuple {

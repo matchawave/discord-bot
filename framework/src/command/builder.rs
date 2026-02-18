@@ -79,6 +79,15 @@ impl TryInto<Vec<CreateCommand>> for &ICommand {
 
         let callbacks = &self.callbacks;
         let mut types = Vec::new();
+
+        if callbacks
+            .par_iter()
+            .find_first(|c| matches!(c, CommandCallbackType::Legacy(_)))
+            .is_some()
+        {
+            types.push("legacy");
+        }
+
         if callbacks
             .par_iter()
             .find_first(|c| matches!(c, CommandCallbackType::Slash(_)))

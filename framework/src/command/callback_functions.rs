@@ -1,28 +1,23 @@
 use serenity::all::{CreateActionRow, CreateEmbed};
 
-use crate::command::{
-    CommandResult, create_error_embed, functions::CallbackReturn, response::CommandResponse,
+use crate::{
+    command::{CommandResult, create_error_embed, response::CommandResponse},
+    handler::CallbackReturn,
 };
 
-impl CallbackReturn for () {
-    fn into_response(self: Box<Self>) -> Option<CommandResponse> {
-        None
-    }
-}
-
-impl CallbackReturn for CommandResponse {
+impl CallbackReturn<CommandResponse> for CommandResponse {
     fn into_response(self: Box<Self>) -> Option<CommandResponse> {
         Some(*self)
     }
 }
 
-impl CallbackReturn for Option<CommandResponse> {
+impl CallbackReturn<CommandResponse> for Option<CommandResponse> {
     fn into_response(self: Box<Self>) -> Option<CommandResponse> {
         *self
     }
 }
 
-impl CallbackReturn for CommandResult<CommandResponse> {
+impl CallbackReturn<CommandResponse> for CommandResult<CommandResponse> {
     fn into_response(self: Box<Self>) -> Option<CommandResponse> {
         match *self {
             Ok(response) => response,
@@ -31,7 +26,7 @@ impl CallbackReturn for CommandResult<CommandResponse> {
     }
 }
 
-impl CallbackReturn for CommandResult<CreateEmbed> {
+impl CallbackReturn<CommandResponse> for CommandResult<CreateEmbed> {
     fn into_response(self: Box<Self>) -> Option<CommandResponse> {
         match *self {
             Ok(Some(embed)) => Some(CommandResponse::new_embeds(vec![embed]).reply()),
@@ -41,7 +36,7 @@ impl CallbackReturn for CommandResult<CreateEmbed> {
     }
 }
 
-impl CallbackReturn for CommandResult<Vec<CreateEmbed>> {
+impl CallbackReturn<CommandResponse> for CommandResult<Vec<CreateEmbed>> {
     fn into_response(self: Box<Self>) -> Option<CommandResponse> {
         match *self {
             Ok(Some(embeds)) => Some(CommandResponse::new_embeds(embeds).reply()),
@@ -51,7 +46,7 @@ impl CallbackReturn for CommandResult<Vec<CreateEmbed>> {
     }
 }
 
-impl CallbackReturn for CommandResult<CreateActionRow> {
+impl CallbackReturn<CommandResponse> for CommandResult<CreateActionRow> {
     fn into_response(self: Box<Self>) -> Option<CommandResponse> {
         match *self {
             Ok(Some(components)) => Some(CommandResponse::new_components(vec![components]).reply()),
@@ -60,7 +55,7 @@ impl CallbackReturn for CommandResult<CreateActionRow> {
         }
     }
 }
-impl CallbackReturn for CommandResult<Vec<CreateActionRow>> {
+impl CallbackReturn<CommandResponse> for CommandResult<Vec<CreateActionRow>> {
     fn into_response(self: Box<Self>) -> Option<CommandResponse> {
         match *self {
             Ok(Some(components)) => Some(CommandResponse::new_components(components).reply()),
@@ -69,7 +64,7 @@ impl CallbackReturn for CommandResult<Vec<CreateActionRow>> {
         }
     }
 }
-impl CallbackReturn for CommandResult<(Vec<CreateEmbed>, Vec<CreateActionRow>)> {
+impl CallbackReturn<CommandResponse> for CommandResult<(Vec<CreateEmbed>, Vec<CreateActionRow>)> {
     fn into_response(self: Box<Self>) -> Option<CommandResponse> {
         match *self {
             Ok(Some((embeds, components))) => Some(

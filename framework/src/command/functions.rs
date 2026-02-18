@@ -1,20 +1,15 @@
 use std::sync::Arc;
 
 use serenity::{
-    all::{CommandInteraction, Context, Message},
+    all::{CommandInteraction, Message},
     async_trait,
 };
-use utils::{Parser, Pointer};
 
 use crate::{
-    HandlerFn,
     command::response::CommandResponse,
-    extractors::{DynHandler, ExtractorTuple, HandlerBuilder},
+    extractors::ExtractorTuple,
+    handler::{CallbackReturn, DynCallback, DynHandler, HandlerBuilder, HandlerFn},
 };
-
-pub trait CallbackReturn: Send + Sync {
-    fn into_response(self: Box<Self>) -> Option<CommandResponse>;
-}
 
 #[derive(Clone)]
 pub enum CommandAction {
@@ -34,36 +29,7 @@ impl From<&CommandInteraction> for CommandAction {
     }
 }
 
-#[async_trait]
-pub trait DynCommandCallback: Send + Sync {
-    async fn call(
-        &self,
-        ctx: &Context,
-        action: &CommandAction,
-        p: &Pointer<Parser>,
-    ) -> Option<CommandResponse>;
-}
-
-#[async_trait]
-impl<D> DynCommandCallback for D
-where
-    D: DynHandler<CommandAction> + 'static,
-    D::Output: CallbackReturn,
-{
-    async fn call(
-        &self,
-        ctx: &Context,
-        action: &CommandAction,
-        p: &Pointer<Parser>,
-    ) -> Option<CommandResponse> {
-        if let Some(result) = DynHandler::call(self, ctx, action, p).await {
-            return Box::new(result).into_response();
-        }
-        None
-    }
-}
-
-type CommandCallback = Arc<dyn DynCommandCallback>;
+type CommandCallback = Arc<dyn DynCallback<CommandAction, CommandResponse>>;
 
 #[derive(Clone)]
 pub enum CommandCallbackType {
@@ -78,7 +44,7 @@ impl CommandCallbackType {
     where
         F: HandlerFn<Args, U> + Send + Sync + Copy + 'static,
         Args: ExtractorTuple<CommandAction> + Send + Sync + 'static,
-        U: CallbackReturn + 'static,
+        U: CallbackReturn<CommandResponse> + 'static,
     {
         let handler = HandlerBuilder::<CommandAction, U>::build(func);
         CommandCallbackType::Slash(Arc::new(handler))
@@ -88,7 +54,7 @@ impl CommandCallbackType {
     where
         F: HandlerFn<Args, U> + Send + Sync + Copy + 'static,
         Args: ExtractorTuple<CommandAction> + Send + Sync + 'static,
-        U: CallbackReturn + 'static,
+        U: CallbackReturn<CommandResponse> + 'static,
     {
         let handler = HandlerBuilder::<CommandAction, U>::build(func);
         CommandCallbackType::Legacy(Arc::new(handler))

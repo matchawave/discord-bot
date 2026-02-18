@@ -51,11 +51,9 @@ where
         self.0.blocking_write()
     }
 
-    pub fn inner(self) -> T {
-        Arc::try_unwrap(self.0)
-            .ok()
-            .expect("Multiple pointers exist")
-            .into_inner()
+    pub fn inner(self) -> Result<T, String> {
+        let value = Arc::try_unwrap(self.0).map_err(|_| "Failed to unwrap Arc".to_string())?;
+        Ok(value.into_inner())
     }
 
     pub async fn set(&self, value: T) -> Self {
