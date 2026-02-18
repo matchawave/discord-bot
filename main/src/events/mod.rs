@@ -2,6 +2,7 @@ mod channel;
 mod guild;
 mod member;
 mod message;
+mod ready;
 mod snipe;
 mod voice_states;
 
@@ -15,7 +16,6 @@ pub fn create_event_handler(shard_count: usize) -> EventManager {
         .add_handler(DiscordEvent::MessageDelete, snipe::deleted)
         .add_handler(DiscordEvent::MessageUpdate, snipe::edited)
         .add_handler(DiscordEvent::ReactionRemove, snipe::reaction)
-        .add_handler(DiscordEvent::MessageUpdate, message::update)
         .add_handler(DiscordEvent::MessageDelete, message::delete)
         // Guild & Channel Events
         .add_handler(DiscordEvent::GuildCreate, guild::create)
@@ -32,6 +32,10 @@ pub fn create_event_handler(shard_count: usize) -> EventManager {
         .add_handler(DiscordEvent::GuildMemberAdd, member::add_member)
         .add_handler(DiscordEvent::GuildMemberRemove, member::subtract_member)
         .add_handler(DiscordEvent::GuildCreate, member::get_members)
+        // Afk Events
+        .add_handler(DiscordEvent::MessageCreate, message::afk::check)
+        // Logs
+        .add_handler(DiscordEvent::MessageUpdate, message::logs::update)
         // Build and return
         .build(shard_count)
 }

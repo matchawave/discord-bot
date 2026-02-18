@@ -220,7 +220,11 @@ pub async fn create(
         let config_format = match (config.read().await.configs).get(&new_channel_id) {
             // Get specific config for this master channel
             Some(c) => Some(c.clone()),
-            None => configs.get_cloned(guild_id, member.user.id).await,
+            None => match configs.get(guild_id, member.user.id).await {
+                // Get user specific config for this guild
+                Some(c) => Some(c.make_clone().await),
+                None => None, // No config found, use defaults
+            },
         };
 
         let parent_id = master.0.or(new_channel.parent_id);
@@ -267,11 +271,11 @@ fn create_channel<'a>(
     guild_id: GuildId,
     parent_id: Option<ChannelId>,
     config: Option<VoiceConfig>,
-    parser: Parser,
+    mut parser: Parser,
 ) -> CreateChannel<'a> {
     let title = match &config {
         Some(cfg) => match &cfg.name {
-            Some(n) => n.format(&parser),
+            Some(n) => n.format(&mut parser),
             None => format!("{}'s channel", user_name),
         },
         None => format!("{}'s channel", user_name),

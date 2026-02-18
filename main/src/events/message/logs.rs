@@ -1,13 +1,21 @@
-use framework::guilds::Messages;
-use serenity::all::{GuildId, Member, Message, PartialGuild};
-use utils::debug;
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
-pub async fn create(guild: PartialGuild, msg: Message, _messages: Messages, member: Member) {
-    if member.user.bot {
-        return;
-    }
-    let content = msg.content.clone();
-}
+use chrono::DateTime;
+use framework::{
+    data::{Ephemeral, Ephemerals},
+    global::GlobalMap,
+    guilds::Messages,
+};
+use serenity::all::{
+    ChannelId, Colour, CreateEmbed, CreateMessage, GuildId, Member, Mentionable, Message,
+    MessageId, PartialGuild, UserId,
+};
+use utils::{HttpType, debug, error};
+
+use crate::{events::message, global::afk::AfkStatus};
 
 macro_rules! log_message_event {
     ($action:expr, $guild:expr, $message_id:expr) => {
@@ -33,11 +41,4 @@ pub async fn update(
     let (channel_id, message_id) = (update_msg.channel_id, update_msg.id);
     messages.insert((channel_id, message_id), update_msg).await;
     log_message_event!("Updated", guild, message_id);
-}
-
-pub async fn delete(guild: PartialGuild, msg: Option<Message>, Messages(messages): Messages) {
-    if let Some(msg) = msg {
-        messages.remove(&(msg.channel_id, msg.id)).await;
-        log_message_event!("Deleted", guild, msg.id);
-    }
 }

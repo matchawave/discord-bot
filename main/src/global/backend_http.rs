@@ -3,11 +3,14 @@ use std::sync::Arc;
 use framework::extractors::{ContextExtractor, Extractor};
 use reqwest::{Client, ClientBuilder, header::HeaderMap};
 use serde::{Serialize, de::DeserializeOwned};
+use serde_json::json;
 use serenity::{
-    all::{Context, GuildId, ShardId},
+    all::{Context, GuildId, ShardId, UserId},
     async_trait,
 };
 use utils::{Pointer, error, info};
+
+use crate::global::afk::AfkStatus;
 
 const PROTOCOL: &str = "http";
 
@@ -187,6 +190,59 @@ impl BackendHttp {
                 error!("Error deleting guild at {}: {:?}", link, e);
             }
         }
+    }
+
+    pub async fn set_user_afk(
+        &self,
+        user_id: UserId,
+        guild_id: Option<GuildId>,
+        reason: String,
+    ) -> Result<AfkStatus, String> {
+        let path = format!("api/afk/user/{}", user_id);
+        let link = self.get_link(&path);
+        let body = json!({
+            "guild_id": guild_id.map(|g| g.to_string()),
+            "reason": reason,
+        });
+
+        match self.client.post(&link).json(&body).send().await {
+            Ok(r) => {
+                if r.status().is_server_error() || r.status().is_client_error() {
+                    return Err(format!("Failed to set AFK status: {}", r.status()));
+                }
+
+                match r.json::<AfkStatus>().await {
+                    Ok(afk_status) => Ok(afk_status),
+                    Err(e) => Err(format!(
+                        "Error parsing AFK status response from {}: {:?}",
+                        link, e
+                    )),
+                }
+            }
+            Err(e) => Err(format!("Error making request to {}: {:?}", link, e)),
+        }
+    }
+
+    pub async fn remove_user_afk(
+        &self,
+        user_id: UserId,
+        guild_id: Option<GuildId>,
+    ) -> Result<(), String> {
+        let mut path = format!("api/afk/user/{}", user_id);
+        if let Some(guild_id) = guild_id {
+            path.push_str(&format!("?guild_id={}", guild_id));
+        }
+
+        let link = self.get_link(&path);
+        match self.client.delete(&link).send().await {
+            Ok(r) => {
+                if r.status().is_server_error() || r.status().is_client_error() {
+                    return Err(format!("Failed to remove AFK status: {}", r.status()));
+                }
+            }
+            Err(e) => return Err(format!("Error making request to {}: {:?}", link, e)),
+        }
+        Ok(())
     }
 }
 

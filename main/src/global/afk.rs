@@ -1,15 +1,23 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Instant};
 
+use chrono::DateTime;
 use serde::{Deserialize, Serialize};
-use serenity::{all::UserId, model::user};
+use serenity::{
+    all::{GuildId, UserId},
+    model::user,
+};
 
 pub struct AfkConfig {}
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Deserialize, Clone)]
 pub struct AfkStatus {
     #[serde(deserialize_with = "deserialize_user_id")]
     pub user_id: UserId,
-    pub afk_since: std::time::Instant, // The time when the user went AFK
+    #[serde(deserialize_with = "deserialize_guild_id")]
+    pub guild_id: Option<GuildId>,
+    #[serde(deserialize_with = "deserialize_created_at")]
+    pub created_at: DateTime<chrono::Utc>,
+    pub reason: String,
 }
 
 fn deserialize_user_id<'de, D>(deserializer: D) -> Result<UserId, D::Error>
@@ -22,32 +30,36 @@ where
     })
 }
 
-impl<'a> Deserialize<'a> for AfkStatus {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'a>,
-    {
-        let mut map = HashMap::<String, String>::deserialize(deserializer)?;
-        let user_id: String = map
-            .remove("user_id")
-            .ok_or_else(|| serde::de::Error::missing_field("user_id"))?;
-        let afk_since: String = map
-            .remove("afk_since")
-            .ok_or_else(|| serde::de::Error::missing_field("afk_since"))?;
-
-        let afk_since = afk_since.parse().map_err(|_| {
+fn deserialize_guild_id<'de, D>(deserializer: D) -> Result<Option<GuildId>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    if s.is_empty() {
+        Ok(None)
+    } else {
+        s.parse().map(Some).map_err(|_| {
             serde::de::Error::invalid_value(
-                serde::de::Unexpected::Str(&afk_since),
-                &"a valid timestamp",
+                serde::de::Unexpected::Str(&s),
+                &"a valid guild ID or empty string",
             )
-        })?;
-        let user_id = user_id.parse().map_err(|_| {
-            serde::de::Error::invalid_value(
-                serde::de::Unexpected::Str(&user_id),
-                &"a valid user ID",
-            )
-        })?;
-
-        Ok(AfkStatus { user_id, afk_since })
+        })
     }
+}
+
+fn deserialize_created_at<'de, D>(deserializer: D) -> Result<DateTime<chrono::Utc>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?; // String is in UTC RFC3339 format
+    let date: DateTime<chrono::Utc> = match DateTime::parse_from_rfc3339(&s) {
+        Ok(dt) => dt.into(),
+        Err(_) => {
+            return Err(serde::de::Error::invalid_value(
+                serde::de::Unexpected::Str(&s),
+                &"a valid RFC3339 datetime string",
+            ));
+        }
+    };
+    Ok(date)
 }
