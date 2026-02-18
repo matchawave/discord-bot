@@ -9,7 +9,7 @@ use serenity::{
 
 pub struct AfkConfig {}
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Clone, Debug)]
 pub struct AfkStatus {
     #[serde(deserialize_with = "deserialize_user_id")]
     pub user_id: UserId,

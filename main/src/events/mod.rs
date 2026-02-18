@@ -34,6 +34,7 @@ pub fn create_event_handler(shard_count: usize) -> EventManager {
         .add_handler(DiscordEvent::GuildCreate, member::get_members)
         // Afk Events
         .add_handler(DiscordEvent::MessageCreate, message::afk::check)
+        .add_handler(DiscordEvent::MessageCreate, message::afk::check_mentions)
         // Logs
         .add_handler(DiscordEvent::MessageUpdate, message::logs::update)
         // Build and return

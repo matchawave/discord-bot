@@ -44,7 +44,7 @@ pub fn command() -> ICommand {
 
     ICommand::new(NAME, DESCRIPTION)
         .options(vec![config_subcommand])
-        .permissions(vec![BotPermission::ManageGuild])
+        .permissions(vec![])
         .callbacks(vec![CCT::slash(interaction), CCT::legacy(legacy)])
 }
 

@@ -10,9 +10,11 @@ use serenity::prelude::TypeMap;
 use crate::websocket::SocketReceiveEvent;
 
 mod backend;
+mod loader;
 mod socials;
 
 use backend::ShardUpdater;
+use loader::AfkLoader;
 use socials::YoutubeProcess;
 
 pub async fn get_bg_process_manager(
@@ -25,6 +27,7 @@ pub async fn get_bg_process_manager(
     manager.register_process(Ephemerals::default());
     manager.register_process(YoutubeProcess::default());
     manager.register_process(ShardUpdater::default());
+    manager.register_process(AfkLoader);
 
     let manager = Arc::new(manager);
     data.insert::<ProcessManager>(manager.clone());

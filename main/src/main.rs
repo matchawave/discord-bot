@@ -57,7 +57,7 @@ async fn main() {
     };
 
     process_manager.init_loop(&client.http, &client.data);
-    command_manager.register(&client.http, true).await;
+    command_manager.register(&client.http, false).await;
 
     if let Err(e) = client.start_shards(shards as u32).await {
         error!("Error starting client: {:?}", e);

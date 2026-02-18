@@ -1,7 +1,8 @@
-use std::sync::Arc;
+use std::{f32::consts::E, pin::Pin, sync::Arc};
 
 use framework::extractors::{ContextExtractor, Extractor};
-use reqwest::{Client, ClientBuilder, header::HeaderMap};
+use futures_util::{Stream, StreamExt};
+use reqwest::{Client, ClientBuilder, Response, header::HeaderMap};
 use serde::{Serialize, de::DeserializeOwned};
 use serde_json::json;
 use serenity::{
@@ -243,6 +244,70 @@ impl BackendHttp {
             Err(e) => return Err(format!("Error making request to {}: {:?}", link, e)),
         }
         Ok(())
+    }
+
+    pub fn stream<T>(
+        &self,
+        endpoint: &str,
+    ) -> Pin<Box<dyn Stream<Item = Result<T, String>> + Send + Sync + '_>>
+    where
+        T: DeserializeOwned + Send + Sync + 'static,
+    {
+        let link = self.get_link(endpoint);
+        Box::pin(async_stream::stream! {
+            let response = match self.client.get(&link).send().await {
+                Ok(resp) => resp,
+                Err(e) => {
+                    error!("Error making request to {}: {:?}", link, e);
+                        yield Err(format!("Error making request to {}: {:?}", link, e));
+                        return;
+                }
+            };
+
+            if response.status().is_server_error() || response.status().is_client_error() {
+                let status = response.status();
+                yield Err(format!("Error making request to {}: {:?}", link, status));
+                return;
+            }
+            let mut stream = response.bytes_stream();
+            let mut buffer = String::new();
+
+            while let Some(chunk_result) = stream.next().await {
+                let chunk = match chunk_result {
+                    Ok(bytes) => bytes,
+                    Err(e) => {
+                        yield Err(format!("Error reading chunk: {}", e));
+                        continue;
+                    }
+                };
+
+                buffer.push_str(&String::from_utf8_lossy(&chunk));
+
+                while let Some(newline_pos) = buffer.find('\n') {
+                    let line = buffer[..newline_pos].trim().to_string();
+                    buffer = buffer[newline_pos + 1..].to_string();
+
+                    if line.is_empty() {
+                        continue;
+                    }
+
+                    match serde_json::from_str::<T>(&line) {
+                        Ok(item) => yield Ok(item),
+                        Err(e) => {
+                            error!("Failed to parse NDJSON line from {}: {} | Line: {}", link, e, line);
+                        }
+                    }
+                }
+            }
+            if !buffer.trim().is_empty() {
+                match serde_json::from_str::<T>(buffer.trim()) {
+                    Ok(item) => yield Ok(item),
+                    Err(e) => {
+                        error!("Failed to parse final buffer from {}: {}", link, e);
+                    }
+                }
+            }
+        })
     }
 }
 
