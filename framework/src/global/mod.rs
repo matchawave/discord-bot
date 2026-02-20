@@ -147,7 +147,10 @@ where
     pub async fn get(&self, guild_id: Option<GuildId>, user_id: UserId) -> Option<Pointer<V>> {
         let map = self.0.read().await;
         if let Some(guild_id) = guild_id {
-            return map.get(&UserGlobalType::Guild(guild_id, user_id)).cloned();
+            return map
+                .get(&UserGlobalType::Guild(guild_id, user_id))
+                .or_else(|| map.get(&UserGlobalType::User(user_id)))
+                .cloned();
         }
         map.get(&UserGlobalType::User(user_id)).cloned()
     }
@@ -167,7 +170,7 @@ where
         let ptr = match guild_id {
             Some(guild_id) => map
                 .remove(&UserGlobalType::Guild(guild_id, user_id))
-                .or(map.remove(&UserGlobalType::User(user_id))),
+                .or_else(|| map.remove(&UserGlobalType::User(user_id))),
             None => map.remove(&UserGlobalType::User(user_id)),
         }?;
 
