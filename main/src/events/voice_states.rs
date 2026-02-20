@@ -220,7 +220,7 @@ pub async fn create(
         let config_format = match (config.read().await.configs).get(&new_channel_id) {
             // Get specific config for this master channel
             Some(c) => Some(c.clone()),
-            None => match configs.get(guild_id, member.user.id).await {
+            None => match configs.get(Some(guild_id), member.user.id).await {
                 // Get user specific config for this guild
                 Some(c) => Some(c.make_clone().await),
                 None => None, // No config found, use defaults

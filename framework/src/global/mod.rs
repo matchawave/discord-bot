@@ -55,17 +55,35 @@ impl<V> GlobalCache<V>
 where
     V: Send + Sync + 'static,
 {
-    pub async fn get(&self, guild_id: GuildId, user_id: UserId) -> Option<Pointer<V>> {
-        match self.0.get(&UserGlobalType::Guild(guild_id, user_id)).await {
-            Some(value) => Some(value),
-            None => self.0.get(&UserGlobalType::User(user_id)).await,
+    pub async fn get(&self, guild_id: Option<GuildId>, user_id: UserId) -> Option<Pointer<V>> {
+        if let Some(guild_id) = guild_id
+            && let Some(value) = self.0.get(&UserGlobalType::Guild(guild_id, user_id)).await
+        {
+            return Some(value);
         }
+        self.0.get(&UserGlobalType::User(user_id)).await
     }
 
-    pub async fn insert(&self, key: UserGlobalType, value: V) -> Pointer<V> {
+    pub async fn insert(&self, guild_id: Option<GuildId>, user_id: UserId, value: V) -> Pointer<V> {
+        let key = guild_id
+            .map(|g_id| UserGlobalType::Guild(g_id, user_id))
+            .unwrap_or(UserGlobalType::User(user_id));
         let ptr: Pointer<V> = Pointer::new(value);
         self.0.insert(key, ptr.clone()).await;
         ptr
+    }
+
+    pub async fn invalidate(&self, guild_id: Option<GuildId>, user_id: UserId) {
+        if let Some(guild_id) = guild_id {
+            return (self.0)
+                .invalidate(&UserGlobalType::Guild(guild_id, user_id))
+                .await;
+        }
+        self.0.invalidate(&UserGlobalType::User(user_id)).await;
+    }
+
+    pub async fn invalidate_all(&self) {
+        self.0.invalidate_all();
     }
 }
 
@@ -126,27 +144,32 @@ impl<V> GlobalMap<V>
 where
     V: Send + Sync + 'static,
 {
-    pub async fn get(&self, guild_id: GuildId, user_id: UserId) -> Option<Pointer<V>> {
+    pub async fn get(&self, guild_id: Option<GuildId>, user_id: UserId) -> Option<Pointer<V>> {
         let map = self.0.read().await;
-        match map.get(&UserGlobalType::Guild(guild_id, user_id)) {
-            Some(value) => Some(value.clone()),
-            None => map.get(&UserGlobalType::User(user_id)).cloned(),
+        if let Some(guild_id) = guild_id {
+            return map.get(&UserGlobalType::Guild(guild_id, user_id)).cloned();
         }
+        map.get(&UserGlobalType::User(user_id)).cloned()
     }
 
-    pub async fn insert(&self, key: UserGlobalType, value: V) -> Pointer<V> {
+    pub async fn insert(&self, guild_id: Option<GuildId>, user_id: UserId, value: V) -> Pointer<V> {
         let mut map = self.0.write().await;
+        let key = guild_id
+            .map(|g_id| UserGlobalType::Guild(g_id, user_id))
+            .unwrap_or(UserGlobalType::User(user_id));
         let ptr = Pointer::new(value);
         map.insert(key, ptr.clone());
         ptr
     }
 
-    pub async fn remove(&self, guild_id: GuildId, user_id: UserId) -> Option<V> {
+    pub async fn remove(&self, guild_id: Option<GuildId>, user_id: UserId) -> Option<V> {
         let mut map = self.0.write().await;
-        let ptr = match map.remove(&UserGlobalType::Guild(guild_id, user_id)) {
-            Some(value) => value,
-            None => map.remove(&UserGlobalType::User(user_id))?,
-        };
+        let ptr = match guild_id {
+            Some(guild_id) => map
+                .remove(&UserGlobalType::Guild(guild_id, user_id))
+                .or(map.remove(&UserGlobalType::User(user_id))),
+            None => map.remove(&UserGlobalType::User(user_id)),
+        }?;
 
         match ptr.inner() {
             Ok(value) => Some(value),
@@ -155,6 +178,20 @@ where
                 None
             }
         }
+    }
+
+    pub async fn contains_user(&self, user_id: UserId) -> bool {
+        let map = self.0.read().await;
+        map.keys().any(|key| match key {
+            UserGlobalType::Guild(_, uid) | UserGlobalType::User(uid) => *uid == user_id,
+        })
+    }
+
+    pub async fn clear_user(&self, user_id: UserId) {
+        let mut map = self.0.write().await;
+        map.retain(|key, _| match key {
+            UserGlobalType::Guild(_, uid) | UserGlobalType::User(uid) => *uid != user_id,
+        });
     }
 }
 

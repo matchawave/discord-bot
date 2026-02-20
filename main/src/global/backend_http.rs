@@ -1,19 +1,35 @@
-use std::{f32::consts::E, pin::Pin, sync::Arc};
+use core::fmt;
+use std::{pin::Pin, sync::Arc};
 
 use framework::extractors::{ContextExtractor, Extractor};
 use futures_util::{Stream, StreamExt};
-use reqwest::{Client, ClientBuilder, Response, header::HeaderMap};
+use reqwest::{Client, ClientBuilder, header::HeaderMap};
 use serde::{Serialize, de::DeserializeOwned};
-use serde_json::json;
+
 use serenity::{
-    all::{Context, GuildId, ShardId, UserId},
+    all::{Context, GuildId, ShardId},
     async_trait,
 };
 use utils::{Pointer, error, info};
 
-use crate::global::afk::AfkStatus;
-
 const PROTOCOL: &str = "http";
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum BackendHttpError {
+    Request(String),
+    Response(String),
+    Parse(String),
+}
+
+impl fmt::Display for BackendHttpError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            BackendHttpError::Request(e) => write!(f, "Request error:\n{}", e),
+            BackendHttpError::Response(e) => write!(f, "Response error:\n{}", e),
+            BackendHttpError::Parse(e) => write!(f, "Parse error:\n{}", e),
+        }
+    }
+}
 
 #[derive(Clone)]
 pub struct BackendHttp {
@@ -40,19 +56,31 @@ impl BackendHttp {
         format!("{}://{}/{}", PROTOCOL, self.api_url, endpoint.into())
     }
 
-    pub async fn get<U: DeserializeOwned>(&self, endpoint: &str) -> Option<U> {
+    pub async fn get<U: DeserializeOwned>(&self, endpoint: &str) -> Result<U, BackendHttpError> {
         let url = self.get_link(endpoint);
         match self.client.get(&url).send().await {
-            Ok(resp) => match resp.json::<U>().await {
-                Ok(data) => Some(data),
-                Err(e) => {
-                    println!("Error parsing GET response from {}: {:?}", url, e);
-                    None
+            Ok(resp) => {
+                if resp.status().is_server_error() || resp.status().is_client_error() {
+                    let status = resp.status();
+                    let response = (resp.text().await)
+                        .unwrap_or_else(|_| "Unable to read response body".to_string());
+                    return Err(BackendHttpError::Response(format!(
+                        "Bad status from GET {endpoint}: {status}\nResponse body: {response}",
+                    )));
                 }
-            },
+                match resp.json::<U>().await {
+                    Ok(data) => Ok(data),
+                    Err(e) => Err(BackendHttpError::Parse(format!(
+                        "Incorrectly parsing GET {endpoint}: {e:?}",
+                    ))),
+                }
+            }
             Err(e) => {
                 println!("Error making GET request to {}: {:?}", url, e);
-                None
+                Err(BackendHttpError::Request(format!(
+                    "Unable to GET {}: {:?}",
+                    endpoint, e
+                )))
             }
         }
     }
@@ -61,59 +89,69 @@ impl BackendHttp {
         &self,
         endpoint: &str,
         payload: &T,
-    ) -> Option<U> {
+    ) -> Result<U, BackendHttpError> {
         let url = self.get_link(endpoint);
-        println!("POST to URL: {}", url);
         match self.client.post(&url).json(payload).send().await {
-            Ok(resp) => match resp.json::<U>().await {
-                Ok(data) => Some(data),
-                Err(e) => {
-                    println!("Error parsing POST response from {}: {:?}", url, e);
-                    None
+            Ok(resp) => {
+                if resp.status().is_server_error() || resp.status().is_client_error() {
+                    let status = resp.status();
+                    let response = (resp.text().await)
+                        .unwrap_or_else(|_| "Unable to read response body".to_string());
+                    return Err(BackendHttpError::Response(format!(
+                        "Bad status from POST {endpoint}: {status}\nResponse body: {response}"
+                    )));
                 }
-            },
-            Err(e) => {
-                println!("Error making POST request to {}: {:?}", url, e);
-                None
+                match resp.json::<U>().await {
+                    Ok(data) => Ok(data),
+                    Err(e) => Err(BackendHttpError::Parse(format!(
+                        "Incorrectly parsing POST {}: {:?}",
+                        endpoint, e
+                    ))),
+                }
             }
+            Err(e) => Err(BackendHttpError::Request(format!(
+                "Unable to POST {}: {:?}",
+                endpoint, e
+            ))),
         }
     }
 
-    pub async fn delete<U: DeserializeOwned>(&self, endpoint: &str) -> Option<U> {
-        let url = self.get_link(endpoint);
-        match self.client.delete(&url).send().await {
-            Ok(resp) => match resp.json::<U>().await {
-                Ok(data) => Some(data),
-                Err(e) => {
-                    println!("Error parsing DELETE response from {}: {:?}", url, e);
-                    None
-                }
-            },
-            Err(e) => {
-                println!("Error making DELETE request to {}: {:?}", url, e);
-                None
-            }
-        }
-    }
-
-    pub async fn put<T: Serialize, U: DeserializeOwned>(
+    pub async fn delete<U: DeserializeOwned>(
         &self,
         endpoint: &str,
-        payload: &T,
-    ) -> Option<U> {
+    ) -> Result<Option<U>, BackendHttpError> {
         let url = self.get_link(endpoint);
-        match self.client.put(&url).json(payload).send().await {
-            Ok(resp) => match resp.json::<U>().await {
-                Ok(data) => Some(data),
-                Err(e) => {
-                    println!("Error parsing PUT response from {}: {:?}", url, e);
-                    None
+        match self.client.delete(&url).send().await {
+            Ok(resp) => {
+                if resp.status().is_server_error() || resp.status().is_client_error() {
+                    let status = resp.status();
+                    let response = (resp.text().await)
+                        .unwrap_or_else(|_| "Unable to read response body".to_string());
+                    return Err(BackendHttpError::Response(format!(
+                        "Bad status from DELETE {endpoint}: {status}\nResponse body: {response}"
+                    )));
                 }
-            },
-            Err(e) => {
-                println!("Error making PUT request to {}: {:?}", url, e);
-                None
+                let body = resp.text().await.map_err(|e| {
+                    BackendHttpError::Parse(format!(
+                        "Error reading DELETE response from {url}: {e:?}",
+                    ))
+                })?;
+
+                if body.is_empty() || body.contains('[') || body.contains('{') {
+                    // crude check for empty response vs JSON response
+                    Ok(None)
+                } else {
+                    match serde_json::from_str::<U>(&body) {
+                        Ok(data) => Ok(Some(data)),
+                        Err(e) => Err(BackendHttpError::Parse(format!(
+                            "Error parsing DELETE response from {url}: {e:?}",
+                        ))),
+                    }
+                }
             }
+            Err(e) => Err(BackendHttpError::Request(format!(
+                "Unable to DELETE {endpoint}: {e:?}",
+            ))),
         }
     }
 
@@ -191,59 +229,6 @@ impl BackendHttp {
                 error!("Error deleting guild at {}: {:?}", link, e);
             }
         }
-    }
-
-    pub async fn set_user_afk(
-        &self,
-        user_id: UserId,
-        guild_id: Option<GuildId>,
-        reason: String,
-    ) -> Result<AfkStatus, String> {
-        let path = format!("api/afk/user/{}", user_id);
-        let link = self.get_link(&path);
-        let body = json!({
-            "guild_id": guild_id.map(|g| g.to_string()),
-            "reason": reason,
-        });
-
-        match self.client.post(&link).json(&body).send().await {
-            Ok(r) => {
-                if r.status().is_server_error() || r.status().is_client_error() {
-                    return Err(format!("Failed to set AFK status: {}", r.status()));
-                }
-
-                match r.json::<AfkStatus>().await {
-                    Ok(afk_status) => Ok(afk_status),
-                    Err(e) => Err(format!(
-                        "Error parsing AFK status response from {}: {:?}",
-                        link, e
-                    )),
-                }
-            }
-            Err(e) => Err(format!("Error making request to {}: {:?}", link, e)),
-        }
-    }
-
-    pub async fn remove_user_afk(
-        &self,
-        user_id: UserId,
-        guild_id: Option<GuildId>,
-    ) -> Result<(), String> {
-        let mut path = format!("api/afk/user/{}", user_id);
-        if let Some(guild_id) = guild_id {
-            path.push_str(&format!("?guild_id={}", guild_id));
-        }
-
-        let link = self.get_link(&path);
-        match self.client.delete(&link).send().await {
-            Ok(r) => {
-                if r.status().is_server_error() || r.status().is_client_error() {
-                    return Err(format!("Failed to remove AFK status: {}", r.status()));
-                }
-            }
-            Err(e) => return Err(format!("Error making request to {}: {:?}", link, e)),
-        }
-        Ok(())
     }
 
     pub fn stream<T>(

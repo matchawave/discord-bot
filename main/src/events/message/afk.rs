@@ -12,20 +12,13 @@ use framework::{
 };
 use serenity::all::{
     ChannelId, Colour, CreateEmbed, CreateMessage, FormattedTimestamp, FormattedTimestampStyle,
-    GuildId, Member, Mentionable, Message, MessageId, MessageReferenceKind, PartialGuild,
-    Timestamp, UserId,
+    GuildId, Mentionable, Message, MessageReferenceKind, PartialGuild, ShardId, Timestamp, UserId,
 };
-use utils::{HttpType, ResponseError, debug, error};
+use utils::{HttpType, ResponseError, error};
 
-use crate::{
-    events::message,
-    global::{
-        afk::AfkStatus,
-        backend_http::{self, BackendHttp},
-    },
-};
+use crate::global::{afk::AfkStatus, backend_http::BackendHttp};
 
-const AFK_MAX_MENTIONED_USERS: usize = 10;
+const AFK_MAX_MENTIONED_USERS: usize = 10; // ! Discord only allows up to 10 embeds per message 
 
 #[allow(clippy::too_many_arguments)]
 pub async fn check(
@@ -38,7 +31,7 @@ pub async fn check(
     http: HttpType,
     backend_http: BackendHttp,
 ) -> EventResult {
-    if let Some(afk_status) = map.remove(guild_id, user_id).await {
+    if let Some(afk_status) = map.remove(Some(guild_id), user_id).await {
         let duration_str = calculate_duration(afk_status.created_at);
 
         let content = format!(
@@ -55,24 +48,29 @@ pub async fn check(
             .add_embed(embed)
             .reference_message(&message);
 
-        let sent_msg = match channel_id.send_message(http, msg).await {
-            Ok(sent_msg) => sent_msg,
-            Err(e) => {
-                return Err(ResponseError::Err(format!(
-                    "Failed to send AFK return message: {e}"
-                )));
+        tokio::spawn(async move {
+            let sent_msg = match channel_id.send_message(http, msg).await {
+                Ok(sent_msg) => sent_msg,
+                Err(e) => {
+                    error!(
+                        "Failed to send AFK return message for user {}: {}",
+                        user_id, e
+                    );
+                    return;
+                }
+            };
+
+            let k = Ephemeral::new(&sent_msg);
+            (ephemerals.0.write().await).insert(k, Instant::now() + Duration::from_secs(5));
+
+            let mut path = format!("api/afk/user/{}", user_id);
+            if let Some(g_id) = afk_status.guild_id {
+                path.push_str(&format!("?guild_id={g_id}"));
             }
-        };
-
-        let k = Ephemeral::new(&sent_msg);
-        (ephemerals.0.write().await).insert(k, Instant::now() + Duration::from_secs(5));
-
-        if let Err(e) = backend_http
-            .remove_user_afk(user_id, afk_status.guild_id)
-            .await
-        {
-            return Err(ResponseError::Err(e));
-        }
+            if let Err(e) = backend_http.delete::<()>(&path).await {
+                error!("Failed to delete AFK status for user {}: {}", user_id, e);
+            }
+        });
     }
 
     Ok(None)
@@ -137,7 +135,7 @@ pub async fn check_mentions(
 
     let mut output_embeds = Vec::with_capacity(mentioned_ids.len());
     for user_id in mentioned_ids {
-        if let Some(afk_status) = map.get(guild.id, user_id).await {
+        if let Some(afk_status) = map.get(Some(guild.id), user_id).await {
             let afk_status = afk_status.read().await; // Clone the AFK status to avoid holding the lock
 
             let formatted = FormattedTimestamp::new(
@@ -160,11 +158,11 @@ pub async fn check_mentions(
     }
 
     let msg = (CreateMessage::default().embeds(output_embeds)).reference_message(&message);
-    if let Err(e) = message.channel_id.send_message(http, msg).await {
-        error!("Failed to send AFK mention message: {e}");
-    }
+    tokio::spawn(async move {
+        if let Err(e) = message.channel_id.send_message(http, msg).await {
+            error!("Failed to send AFK mention message: {e}");
+        }
+    });
 
     Ok(None)
 }
-
-// {user}: is AFK: **{reason}** - {discord_formatted_duration}

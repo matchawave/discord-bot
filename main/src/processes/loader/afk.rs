@@ -39,12 +39,8 @@ impl ProcessLoop for AfkLoader {
         let mut count = 0;
         while let Some(afk_status) = response_stream.next().await {
             match afk_status {
-                Ok(afk_status) => {
-                    let key = afk_status
-                        .guild_id
-                        .map(|g_id| UserGlobalType::Guild(g_id, afk_status.user_id))
-                        .unwrap_or(UserGlobalType::User(afk_status.user_id));
-                    afk_statuses.insert(key, afk_status).await;
+                Ok(status) => {
+                    (afk_statuses.insert(status.guild_id, status.user_id, status)).await;
                     count += 1;
                 }
                 Err(e) => {

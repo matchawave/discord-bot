@@ -1,3 +1,4 @@
+mod deserialize;
 mod discord;
 mod legacy;
 mod logging;
@@ -7,6 +8,7 @@ mod permissions;
 
 use std::{fmt::Debug, ops::Deref, sync::Arc};
 
+pub use deserialize::*;
 pub use discord::*;
 pub use legacy::*;
 pub use logging::*;
