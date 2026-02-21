@@ -1,9 +1,6 @@
 use std::sync::Arc;
 
-use serenity::{
-    all::{CommandInteraction, Message},
-    async_trait,
-};
+use serenity::all::{CommandInteraction, Message};
 
 use crate::{
     command::response::CommandResponse,

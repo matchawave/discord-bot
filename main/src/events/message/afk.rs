@@ -12,9 +12,9 @@ use framework::{
 };
 use serenity::all::{
     ChannelId, Colour, CreateEmbed, CreateMessage, FormattedTimestamp, FormattedTimestampStyle,
-    GuildId, Mentionable, Message, MessageReferenceKind, PartialGuild, ShardId, Timestamp, UserId,
+    GuildId, Mentionable, Message, MessageReferenceKind, PartialGuild, Timestamp, UserId,
 };
-use utils::{HttpType, ResponseError, error};
+use utils::{HttpType, error};
 
 use crate::global::{afk::AfkStatus, backend_http::BackendHttp};
 

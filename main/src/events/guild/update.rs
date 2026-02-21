@@ -13,23 +13,6 @@ use crate::{
     global::backend_http::{self, BackendHttp},
 };
 
-pub async fn create(
-    shard_id: ShardId,
-    guild: PartialGuild,
-    guild_map: GuildMap,
-    backend_http: BackendHttp,
-) {
-    info!("Joined guild {} ({})", guild.name, guild.id);
-    let mut map_write = guild_map.write().await;
-    map_write.insert::<Snipes>(Snipes::default().0);
-    map_write.insert::<EditSnipes>(EditSnipes::default().0);
-    map_write.insert::<ReactionSnipes>(ReactionSnipes::default().0);
-
-    backend_http.register_guild(guild.id, shard_id).await;
-}
-
-// pub async fn
-
 pub async fn update(guild: PartialGuild, guilds: Guilds) {
     if let Some(old_guild_ptr) = guilds.get_ptr::<PartialGuild>(guild.id).await {
         let old_guild = old_guild_ptr.make_clone().await;
@@ -38,20 +21,6 @@ pub async fn update(guild: PartialGuild, guilds: Guilds) {
             info!("Guild Update for {} ({}): {}", guild.name, guild.id, c);
         });
         old_guild_ptr.write().await.clone_from(&guild);
-    }
-}
-
-pub async fn delete(
-    unavailable_guild: UnavailableGuild,
-    guild: PartialGuild,
-    backend_http: BackendHttp,
-) {
-    if unavailable_guild.unavailable {
-        info!("Guild {} ({}) got deleted", guild.name, guild.id);
-        backend_http.delete_guild(guild.id).await;
-    } else {
-        info!("Bot got removed from guild {} ({})", guild.name, guild.id);
-        backend_http.disable_guild(guild.id).await;
     }
 }
 

@@ -1,11 +1,6 @@
-use std::{collections::HashMap, time::Instant};
-
 use chrono::DateTime;
-use serde::{Deserialize, Serialize};
-use serenity::{
-    all::{GuildId, UserId},
-    model::user,
-};
+use serde::Deserialize;
+use serenity::all::{GuildId, UserId};
 use utils::{deserialize_date, deserialize_id, deserialize_optional_id};
 
 #[derive(Deserialize, Clone, Debug)]

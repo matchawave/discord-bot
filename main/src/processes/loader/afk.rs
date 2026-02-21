@@ -1,10 +1,6 @@
 use std::sync::Arc;
 
-use framework::{
-    data,
-    global::{GlobalMap, UserGlobalType},
-    processes::ProcessLoop,
-};
+use framework::{global::GlobalMap, processes::ProcessLoop};
 use futures_util::StreamExt;
 use serenity::{async_trait, prelude::TypeMapKey};
 use utils::{error, info};
@@ -35,21 +31,26 @@ impl ProcessLoop for AfkLoader {
             (backend_http, afk_statuses)
         };
 
-        let mut response_stream = backend_http.stream::<AfkStatus>("api/afk");
-        let mut count = 0;
-        while let Some(afk_status) = response_stream.next().await {
-            match afk_status {
-                Ok(status) => {
-                    (afk_statuses.insert(status.guild_id, status.user_id, status)).await;
-                    count += 1;
+        match backend_http.stream::<AfkStatus>("api/afk").await {
+            Ok(mut stream) => {
+                let mut count = 0;
+                while let Some(afk_status) = stream.next().await {
+                    match afk_status {
+                        Ok(status) => {
+                            (afk_statuses.insert(status.guild_id, status.user_id, status)).await;
+                            count += 1;
+                        }
+                        Err(e) => {
+                            error!("AFKLoader: Error reading AFK status from stream: {e}");
+                            continue;
+                        }
+                    }
                 }
-                Err(e) => {
-                    error!("AFKLoader: Error reading AFK status from stream: {e}");
-                    continue;
-                }
+                info!("AfkLoader: Finished loading AFK statuses, total count: {count}");
+            }
+            Err(e) => {
+                error!("AFKLoader: Failed to start AFK status stream: {e}");
             }
         }
-
-        info!("AfkLoader: Finished loading AFK statuses, total count: {count}");
     }
 }

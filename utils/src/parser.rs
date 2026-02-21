@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use dashmap::DashMap;
 use rayon::{
     iter::{
         IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
@@ -310,7 +309,7 @@ impl Parser {
         value.clone()
     }
 
-    fn handle_level(&self, key: &str) -> Option<String> {
+    fn handle_level(&self, _key: &str) -> Option<String> {
         Some("`n/a`".to_string())
     }
 }

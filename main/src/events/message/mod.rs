@@ -3,7 +3,7 @@ use serenity::all::{Member, Message, PartialGuild};
 
 pub mod afk;
 pub mod logs;
-
+pub mod snipe;
 pub async fn create(guild: PartialGuild, msg: Message, _messages: Messages, member: Member) {
     if member.user.bot {
         return;

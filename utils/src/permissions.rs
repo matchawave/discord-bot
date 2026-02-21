@@ -1,5 +1,3 @@
-use std::fmt::{Display, Formatter};
-
 use serenity::all::Permissions;
 use strum_macros::Display;
 

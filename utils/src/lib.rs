@@ -11,19 +11,14 @@ use std::{fmt::Debug, ops::Deref, sync::Arc};
 pub use deserialize::*;
 pub use discord::*;
 pub use legacy::*;
-pub use logging::*;
 pub use pagination::*;
 pub use parser::*;
 pub use permissions::*;
-use serde::Serialize;
 use serenity::{
     all::{Member, Timestamp},
     prelude::TypeMapKey,
 };
-use tokio::{
-    sync::{RwLock, RwLockReadGuard, RwLockWriteGuard},
-    task,
-};
+use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 pub struct Pointer<T: ?Sized>(Arc<RwLock<T>>)
 where

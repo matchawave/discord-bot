@@ -1,6 +1,6 @@
 use chrono::{DateTime, Duration, Utc};
 use serenity::all::{
-    ChannelId, CreateActionRow, CreateButton, CreateEmbed, MessageId, ReactionType, UserId,
+    ChannelId, CreateActionRow, CreateButton, CreateEmbed, MessageId, ReactionType,
 };
 
 #[derive(Clone, Debug)]

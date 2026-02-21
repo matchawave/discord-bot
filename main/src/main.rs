@@ -1,14 +1,15 @@
-use std::sync::Arc;
-
 use framework::{ShardData, extractors::ShardManagerContainer};
 use serenity::{
     Client,
-    all::{ApplicationId, ClientBuilder, GatewayIntents, Http, ShardManager},
+    all::{ApplicationId, ClientBuilder, GatewayIntents, Http},
     prelude::TypeMap,
 };
-use utils::{DataType, error};
+use utils::error;
 
-use crate::global::{backend_http::BackendHttp, set_global};
+use crate::global::{
+    backend_http::{BackendHttp, set_shards},
+    set_global,
+};
 mod cache;
 mod commands;
 mod configs;
@@ -32,7 +33,7 @@ async fn main() {
     let event_handler = events::create_event_handler(shards); // Create the event handler for the bot
     let command_manager = commands::create_command_handler(); // Command manager for registering and handling commands
     let backend_http = BackendHttp::new(token, api_url); // This is for communicating with the backend serverlet backend_http = BackendHttp::new(token, api_url); // This is for communicating with the backend server
-    backend_http.set_shards(shards as u32).await; // Set the number of shards in the backend
+    set_shards(&backend_http, shards as u32).await; // Set the number of shards in the backend
     let websocket = websocket::get_websocket_connection().build(api_url, bot_id, token); // WebSocket connection to the backend
     let process_manager = processes::get_bg_process_manager(&mut data, websocket).await; // Background process manager
 

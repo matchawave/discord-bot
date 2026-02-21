@@ -102,14 +102,21 @@ async fn interaction(
         }
         // For simplicity, we'll just use the default reason in this example
         let path = format!("api/afk/user/config/{}", user_id);
-        let result: AfkConfigResponse = (backend_http.post(&path, &new_config_body).await)
-            .map_err(|e| {
+        let Some(result): Option<AfkConfigResponse> =
+            (backend_http.post(&path, &new_config_body).await).map_err(|e| {
                 error!("Error updating AFK config for user {user_id}: {e}");
                 ResponseError::Err(format!(
                     "{}: Failed to update AFK configuration",
                     user_id.mention()
                 ))
-            })?;
+            })?
+        else {
+            error!("No response received when updating AFK config for user {user_id}");
+            return Err(ResponseError::Err(format!(
+                "{}: Failed to update AFK configuration",
+                user_id.mention()
+            )));
+        };
 
         let old_config = result.old_config;
         let new_config = result.new_config;
@@ -198,14 +205,22 @@ async fn legacy(
         reason: reason.clone(),
     };
 
-    let afk_status: AfkStatus = backend_http.post(&path, &payload).await.map_err(|e| {
-        if let Some(guild_id) = guild_id {
-            error!("Error setting AFK status for user {user_id} in guild {guild_id}: {e}");
-        } else {
-            error!("Error setting global AFK status for user {user_id}: {e}");
-        }
-        ResponseError::Err(format!("{}: Failed to set AFK status", user_id.mention()))
-    })?;
+    let Some(afk_status): Option<AfkStatus> =
+        backend_http.post(&path, &payload).await.map_err(|e| {
+            if let Some(guild_id) = guild_id {
+                error!("Error setting AFK status for user {user_id} in guild {guild_id}: {e}");
+            } else {
+                error!("Error setting global AFK status for user {user_id}: {e}");
+            }
+            ResponseError::Err(format!("{}: Failed to set AFK status", user_id.mention()))
+        })?
+    else {
+        error!("No response received when setting AFK status for user {user_id}");
+        return Err(ResponseError::Err(format!(
+            "{}: Failed to set AFK status",
+            user_id.mention()
+        )));
+    };
 
     let reason = afk_status.reason.clone();
     map.insert(guild_id, user_id, afk_status).await;
@@ -228,8 +243,11 @@ async fn get_user_config(
         let path = format!("api/afk/user/config/{}", user_id);
         match backend_http.get::<AfkConfig>(&path).await {
             Ok(config) => {
-                let ptr = cache.insert(None, user_id, config.clone()).await;
-                Ok(Some(ptr))
+                if let Some(config) = &config {
+                    let ptr = cache.insert(None, user_id, config.clone()).await;
+                    return Ok(Some(ptr));
+                }
+                return Ok(None);
             }
             Err(e) => {
                 error!("Error fetching AFK config for user {user_id}: {e}");
