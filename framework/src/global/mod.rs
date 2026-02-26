@@ -24,7 +24,7 @@ pub enum UserGlobalType {
 }
 
 #[derive(Debug)]
-pub struct GlobalCache<V>(Cache<UserGlobalType, Pointer<V>>)
+pub struct GlobalCache<V>(Cache<UserGlobalType, Option<Pointer<V>>>)
 where
     V: Send + Sync + 'static;
 
@@ -55,7 +55,11 @@ impl<V> GlobalCache<V>
 where
     V: Send + Sync + 'static,
 {
-    pub async fn get(&self, guild_id: Option<GuildId>, user_id: UserId) -> Option<Pointer<V>> {
+    pub async fn get(
+        &self,
+        guild_id: Option<GuildId>,
+        user_id: UserId,
+    ) -> Option<Option<Pointer<V>>> {
         if let Some(guild_id) = guild_id
             && let Some(value) = self.0.get(&UserGlobalType::Guild(guild_id, user_id)).await
         {
@@ -69,8 +73,15 @@ where
             .map(|g_id| UserGlobalType::Guild(g_id, user_id))
             .unwrap_or(UserGlobalType::User(user_id));
         let ptr: Pointer<V> = Pointer::new(value);
-        self.0.insert(key, ptr.clone()).await;
+        self.0.insert(key, Some(ptr.clone())).await;
         ptr
+    }
+
+    pub async fn insert_none(&self, guild_id: Option<GuildId>, user_id: UserId) {
+        let key = guild_id
+            .map(|g_id| UserGlobalType::Guild(g_id, user_id))
+            .unwrap_or(UserGlobalType::User(user_id));
+        self.0.insert(key, None).await;
     }
 
     pub async fn invalidate(&self, guild_id: Option<GuildId>, user_id: UserId) {

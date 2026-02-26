@@ -1,5 +1,5 @@
 use framework::{
-    command::{CommandCallbackType as CCT, CommandResult, ICommand},
+    command::{CommandBuilder, CommandResult, ICommand},
     extractors::InteractionOptions,
     global::{GlobalCache, GlobalMap},
 };
@@ -8,7 +8,7 @@ use serenity::all::{
     CommandDataOption, CommandDataOptionValue, CommandOptionType, CreateCommandOption, CreateEmbed,
     GuildId, Member, Mentionable, UserId,
 };
-use utils::{Pointer, ResponseError, debug, error, info};
+use utils::{Pointer, ResponseError, error, info};
 
 use crate::{
     configs::AfkConfig,
@@ -41,10 +41,12 @@ pub fn command() -> ICommand {
     .add_sub_option(per_guild_option)
     .add_sub_option(default_reason_option);
 
-    ICommand::new(NAME, DESCRIPTION)
+    CommandBuilder::default()
         .options(vec![config_subcommand])
         .permissions(vec![])
-        .callbacks(vec![CCT::slash(interaction), CCT::legacy(legacy)])
+        .slash(interaction)
+        .legacy(legacy)
+        .build(NAME, DESCRIPTION)
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -238,7 +240,7 @@ async fn get_user_config(
     backend_http: &BackendHttp,
 ) -> CommandResult<Pointer<AfkConfig>> {
     if let Some(config) = cache.get(None, user_id).await {
-        Ok(Some(config))
+        Ok(config)
     } else {
         let path = format!("api/afk/user/config/{}", user_id);
         match backend_http.get::<AfkConfig>(&path).await {
@@ -247,7 +249,8 @@ async fn get_user_config(
                     let ptr = cache.insert(None, user_id, config.clone()).await;
                     return Ok(Some(ptr));
                 }
-                return Ok(None);
+                cache.insert_none(None, user_id).await;
+                Ok(None)
             }
             Err(e) => {
                 error!("Error fetching AFK config for user {user_id}: {e}");

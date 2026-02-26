@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use framework::{
-    command::{CommandCallbackType as CCT, CommandResult, ICommand},
+    command::{CommandBuilder, CommandResult, ICommand},
     extractors::ShardManagerContainer,
 };
 use serenity::all::{
@@ -14,10 +14,11 @@ const NAME: &str = "ping";
 const DESCRIPTION: &str = "Check the bot's latency";
 
 pub fn command() -> ICommand {
-    // let options = CreateCommandOption::new(CommandOptionType::String, "", "");
-    ICommand::new(NAME, DESCRIPTION)
+    CommandBuilder::default()
         .cooldown(3000)
-        .callbacks(vec![CCT::slash(interaction), CCT::legacy(legacy)])
+        .slash(interaction)
+        .legacy(legacy)
+        .build(NAME, DESCRIPTION)
 }
 
 const PING_RESPONSE_TEMPLATE: &str = "Pong! It took {time} to ping.";

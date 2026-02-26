@@ -222,8 +222,11 @@ pub async fn create(
             Some(c) => Some(c.clone()),
             None => match configs.get(Some(guild_id), member.user.id).await {
                 // Get user specific config for this guild
-                Some(c) => Some(c.make_clone().await),
-                None => None, // No config found, use defaults
+                Some(c) => match c {
+                    Some(cfg) => Some(cfg.make_clone().await),
+                    None => None, // This means the user literally has no config, not even default, so we will just use the default config in this case
+                },
+                None => None, // This would normally be where you request to the backend for for a user specific config, but since voice channel creation is a very latency sensitive action, we will just use the default config if it is not in the cache
             },
         };
 

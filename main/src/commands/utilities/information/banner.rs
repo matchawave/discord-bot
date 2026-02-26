@@ -1,5 +1,5 @@
 use framework::{
-    command::{CommandCallbackType as CCT, CommandResult, ICommand},
+    command::{CommandBuilder, CommandResult, ICommand},
     extractors::InteractionOptions,
     guilds::{HTTPGetter, Members},
 };
@@ -20,9 +20,11 @@ pub fn command() -> ICommand {
         "user",
         "The user to get the banner of",
     );
-    ICommand::new(NAME, DESCRIPTION)
+    CommandBuilder::default()
         .options(vec![options])
-        .callbacks(vec![CCT::slash(interaction), CCT::legacy(legacy)])
+        .slash(interaction)
+        .legacy(legacy)
+        .build(NAME, DESCRIPTION)
 }
 
 async fn interaction(
@@ -93,7 +95,7 @@ fn create_embed(target: Member, author: CreateEmbedAuthor) -> CreateEmbed {
         240
     ));
     CreateEmbed::default()
-        .title(format!("Avatar of {}", target.user.tag()))
+        .title(format!("Banner of {}", target.user.tag()))
         .image(banner)
         .color(color)
         .author(author)

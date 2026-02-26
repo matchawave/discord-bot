@@ -1,22 +1,34 @@
 use std::sync::Arc;
 
-use serenity::all::{CommandInteraction, Message};
+use serde::{Deserialize, Serialize};
+use serenity::{
+    all::{CommandInteraction, Context, Message},
+    async_trait,
+};
+use utils::{Parser, Pointer};
 
 use crate::{
     command::response::CommandResponse,
-    extractors::ExtractorTuple,
+    extractors::{EventExtractor, Extractor, ExtractorTuple},
     handler::{CallbackReturn, DynCallback, DynHandler, HandlerBuilder, HandlerFn},
 };
 
-#[derive(Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CommandAction {
+    // Name of the command, and the event that triggered it
     Interaction(Box<CommandInteraction>),
     Message(Box<Message>),
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CommandEvent {
+    pub name: String,
+    pub action: CommandAction,
+}
+
 impl From<&Message> for CommandAction {
-    fn from(msg: &Message) -> Self {
-        CommandAction::Message(Box::new(msg.clone()))
+    fn from(message: &Message) -> Self {
+        CommandAction::Message(Box::new(message.clone()))
     }
 }
 
@@ -64,5 +76,21 @@ impl CommandCallbackType {
     {
         let handler = HandlerBuilder::<CommandAction, Vec<String>>::build(func);
         CommandCallbackType::Autocomplete(Arc::new(handler))
+    }
+}
+
+pub struct CommandName(pub String);
+
+#[async_trait]
+impl EventExtractor<CommandEvent> for CommandName {
+    async fn extract_event(event: &CommandEvent) -> Option<Self> {
+        Some(CommandName(event.name.clone()))
+    }
+}
+
+#[async_trait]
+impl Extractor<CommandEvent> for CommandName {
+    async fn extract(_ctx: &Context, event: &CommandEvent, _p: &Pointer<Parser>) -> Option<Self> {
+        Self::extract_event(event).await
     }
 }

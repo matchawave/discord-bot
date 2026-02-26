@@ -1,17 +1,26 @@
-use super::functions::CommandCallbackType;
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use std::sync::Arc;
+
+use crate::{
+    command::{CommandAction, response::CommandResponse},
+    extractors::ExtractorTuple,
+    handler::{CallbackReturn, DynCallback, DynHandler, HandlerBuilder, HandlerFn},
+};
+
 use serenity::all::{CommandType, CreateCommand, CreateCommandOption};
 use utils::{BotPermission, info};
-pub type StoredCommand = (Vec<CommandCallbackType>, Vec<BotPermission>);
 
 #[derive(Clone)]
 pub struct ICommand {
     name: String,
     description: String,
     options: Vec<CreateCommandOption>,
-    pub(crate) cooldown: Option<u64>,
-    pub(crate) permissions: Vec<BotPermission>,
-    pub(crate) callbacks: Vec<CommandCallbackType>,
+    cooldown: Option<u64>,
+    permissions: Vec<BotPermission>,
+    slash_callback: Option<CommandCallback<CommandResponse>>,
+    legacy_callback: Option<CommandCallback<CommandResponse>>,
+    autocomplete_callback: Option<AutocompleteCallback>,
+    user_callback: Option<CommandCallback<CommandResponse>>,
+    message_callback: Option<CommandCallback<CommandResponse>>,
 }
 
 #[macro_export]
@@ -32,7 +41,11 @@ impl ICommand {
             cooldown: None,
             options: Vec::new(),
             permissions: Vec::new(),
-            callbacks: Vec::new(),
+            slash_callback: None,
+            legacy_callback: None,
+            autocomplete_callback: None,
+            user_callback: None,
+            message_callback: None,
         }
     }
 
@@ -40,29 +53,28 @@ impl ICommand {
         &self.name
     }
 
-    pub fn permissions(mut self, permissions: Vec<BotPermission>) -> Self {
-        self.permissions = permissions;
-        self
+    pub fn permissions(&self) -> &Vec<BotPermission> {
+        &self.permissions
     }
 
-    pub fn cooldown(mut self, cooldown: u64) -> Self {
-        self.cooldown = Some(cooldown);
-        self
+    pub fn cooldown(&self) -> Option<u64> {
+        self.cooldown
     }
 
-    pub fn options(mut self, options: Vec<CreateCommandOption>) -> Self {
-        self.options = options;
-        self
+    pub fn options(&self) -> &Vec<CreateCommandOption> {
+        &self.options
     }
 
-    pub fn add_callback(mut self, callback: CommandCallbackType) -> Self {
-        self.callbacks.push(callback);
-        self
+    pub fn slash(&self) -> Option<CommandCallback<CommandResponse>> {
+        self.slash_callback.clone()
     }
 
-    pub fn callbacks(mut self, callback: Vec<CommandCallbackType>) -> Self {
-        self.callbacks = callback;
-        self
+    pub fn legacy(&self) -> Option<CommandCallback<CommandResponse>> {
+        self.legacy_callback.clone()
+    }
+
+    pub fn autocomplete(&self) -> Option<AutocompleteCallback> {
+        self.autocomplete_callback.clone()
     }
 }
 
@@ -71,28 +83,15 @@ impl TryInto<Vec<CreateCommand>> for &ICommand {
 
     fn try_into(self) -> Result<Vec<CreateCommand>, Self::Error> {
         let name = self.name();
-        if self.callbacks.is_empty() {
-            return Err(format!("No callbacks defined for command '{}'", name));
-        }
 
         let mut commands = Vec::new();
-
-        let callbacks = &self.callbacks;
         let mut types = Vec::new();
 
-        if callbacks
-            .par_iter()
-            .find_first(|c| matches!(c, CommandCallbackType::Legacy(_)))
-            .is_some()
-        {
+        if self.legacy_callback.is_some() {
             types.push("legacy");
         }
 
-        if callbacks
-            .par_iter()
-            .find_first(|c| matches!(c, CommandCallbackType::Slash(_)))
-            .is_some()
-        {
+        if self.slash_callback.is_some() {
             let mut cmd = CreateCommand::new(self.name.clone())
                 .kind(CommandType::ChatInput)
                 .description(self.description.clone())
@@ -103,13 +102,13 @@ impl TryInto<Vec<CreateCommand>> for &ICommand {
 
             commands.push(cmd);
             types.push("slash");
+
+            if self.autocomplete_callback.is_some() {
+                types.push("autocomplete");
+            }
         }
 
-        if callbacks
-            .par_iter()
-            .find_first(|c| matches!(c, CommandCallbackType::User(_)))
-            .is_some()
-        {
+        if self.user_callback.is_some() {
             let cmd = CreateCommand::new(self.name.clone())
                 .kind(CommandType::User)
                 .description(self.description.clone())
@@ -119,11 +118,7 @@ impl TryInto<Vec<CreateCommand>> for &ICommand {
             types.push("user");
         }
 
-        if callbacks
-            .par_iter()
-            .find_first(|c| matches!(c, CommandCallbackType::Message(_)))
-            .is_some()
-        {
+        if self.message_callback.is_some() {
             let cmd = CreateCommand::new(self.name.clone())
                 .kind(CommandType::Message)
                 .description(self.description.clone())
@@ -145,12 +140,81 @@ impl TryInto<Vec<CreateCommand>> for &ICommand {
     }
 }
 
-impl From<&ICommand> for StoredCommand {
-    fn from(command: &ICommand) -> Self {
-        // For simplicity, we return the first callback and permission
-        // In a real implementation, you might want to handle multiple callbacks and permissions
-        let callbacks = command.callbacks.clone();
-        let permissions = command.permissions.clone();
-        (callbacks, permissions)
+type CommandCallback<T> = Arc<dyn DynCallback<CommandAction, T>>;
+type AutocompleteCallback = Arc<dyn DynHandler<CommandAction, Output = Vec<String>>>;
+
+#[derive(Default)]
+pub struct CommandBuilder {
+    options: Vec<CreateCommandOption>,
+    cooldown: Option<u64>,
+    permissions: Vec<BotPermission>,
+    slash_callback: Option<CommandCallback<CommandResponse>>,
+    legacy_callback: Option<CommandCallback<CommandResponse>>,
+    autocomplete_callback: Option<AutocompleteCallback>,
+    user_callback: Option<CommandCallback<CommandResponse>>,
+    message_callback: Option<CommandCallback<CommandResponse>>,
+}
+
+impl CommandBuilder {
+    pub fn permissions(mut self, permissions: Vec<BotPermission>) -> Self {
+        self.permissions = permissions;
+        self
+    }
+
+    pub fn cooldown(mut self, cooldown: u64) -> Self {
+        self.cooldown = Some(cooldown);
+        self
+    }
+
+    pub fn options(mut self, options: Vec<CreateCommandOption>) -> Self {
+        self.options = options;
+        self
+    }
+
+    pub fn slash<F, U, Args>(mut self, func: F) -> Self
+    where
+        F: HandlerFn<Args, U> + Send + Sync + Copy + 'static,
+        Args: ExtractorTuple<CommandAction> + Send + Sync + 'static,
+        U: CallbackReturn<CommandResponse> + 'static,
+    {
+        self.slash_callback = Some(Arc::new(HandlerBuilder::<CommandAction, U>::build(func)));
+        self
+    }
+
+    pub fn legacy<F, U, Args>(mut self, func: F) -> Self
+    where
+        F: HandlerFn<Args, U> + Send + Sync + Copy + 'static,
+        Args: ExtractorTuple<CommandAction> + Send + Sync + 'static,
+        U: CallbackReturn<CommandResponse> + 'static,
+    {
+        self.legacy_callback = Some(Arc::new(HandlerBuilder::<CommandAction, U>::build(func)));
+        self
+    }
+
+    pub fn autocomplete<F, Args>(mut self, func: F) -> Self
+    where
+        F: HandlerFn<Args, Vec<String>> + Send + Sync + Copy + 'static,
+        Args: ExtractorTuple<CommandAction> + Send + Sync + 'static,
+    {
+        let handler = HandlerBuilder::<CommandAction, Vec<String>>::build(func);
+        self.autocomplete_callback = Some(Arc::new(handler));
+        self
+    }
+
+    // Similar methods for user_callback and message_callback can be added here
+
+    pub fn build<T: Into<String>>(self, name: T, description: T) -> ICommand {
+        ICommand {
+            name: name.into(),
+            description: description.into(),
+            options: self.options,
+            cooldown: self.cooldown,
+            permissions: self.permissions,
+            slash_callback: self.slash_callback,
+            legacy_callback: self.legacy_callback,
+            autocomplete_callback: self.autocomplete_callback,
+            user_callback: self.user_callback,
+            message_callback: self.message_callback,
+        }
     }
 }

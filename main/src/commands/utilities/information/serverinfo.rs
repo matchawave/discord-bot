@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use framework::{
-    command::{CommandCallbackType as CCT, CommandResult, ICommand},
+    command::{CommandBuilder, CommandResult, ICommand},
     extractors::ShardManagerContainer,
     guilds::Channels,
 };
@@ -17,7 +17,10 @@ const NAME: &str = "serverinfo";
 const DESCRIPTION: &str = "Get information about the server";
 
 pub fn command() -> ICommand {
-    ICommand::new(NAME, DESCRIPTION).callbacks(vec![CCT::slash(interaction), CCT::legacy(legacy)])
+    CommandBuilder::default()
+        .slash(interaction)
+        .legacy(legacy)
+        .build(NAME, DESCRIPTION)
 }
 
 async fn interaction(

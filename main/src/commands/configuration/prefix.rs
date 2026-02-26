@@ -1,5 +1,5 @@
 use framework::{
-    command::{CommandCallbackType as CCT, CommandResult, ICommand},
+    command::{CommandBuilder, CommandResult, ICommand},
     data::{DefaultPrefix, Prefix},
     extractors::InteractionOptions,
 };
@@ -33,10 +33,12 @@ pub fn command() -> ICommand {
         "get",
         "Get the current server prefix",
     );
-    ICommand::new(NAME, DESCRIPTION)
+    CommandBuilder::default()
         .options(vec![set_options, remove_options, get_options])
         .permissions(vec![BotPermission::BotMaster])
-        .callbacks(vec![CCT::slash(interaction), CCT::legacy(legacy)])
+        .slash(interaction)
+        .legacy(legacy)
+        .build(NAME, DESCRIPTION)
 }
 
 async fn interaction(

@@ -1,5 +1,5 @@
 use framework::{
-    command::{CommandCallbackType as CCT, CommandResult, ICommand},
+    command::{CommandBuilder, CommandResult, ICommand},
     extractors::InteractionOptions,
     guilds::{HTTPGetter, Members},
 };
@@ -22,11 +22,13 @@ pub fn command() -> ICommand {
     let options = CreateCommandOption::new(
         CommandOptionType::User,
         "user",
-        "The user to get the avatar of",
+        "The user to get the info of",
     );
-    ICommand::new(NAME, DESCRIPTION)
+    CommandBuilder::default()
         .options(vec![options])
-        .callbacks(vec![CCT::slash(interaction), CCT::legacy(legacy)])
+        .slash(interaction)
+        .legacy(legacy)
+        .build(NAME, DESCRIPTION)
 }
 
 async fn interaction(

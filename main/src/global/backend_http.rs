@@ -101,7 +101,8 @@ impl BackendHttp {
         let body: String =
             (response.text().await).map_err(|e| BackendHttpError::not_json("GET", endpoint, e))?;
 
-        if body.trim().is_empty() {
+        let trimmed_body = body.trim().to_lowercase();
+        if trimmed_body.is_empty() || trimmed_body == "null" {
             return Ok(None);
         }
 
@@ -129,7 +130,8 @@ impl BackendHttp {
                 let body = (resp.text().await)
                     .map_err(|e| BackendHttpError::not_json("POST", endpoint, e))?;
 
-                if body.trim().is_empty() {
+                let trimmed_body = body.trim().to_lowercase();
+                if trimmed_body.is_empty() || trimmed_body == "null" {
                     return Ok(None);
                 }
 
@@ -163,7 +165,8 @@ impl BackendHttp {
                 let body = (resp.text().await)
                     .map_err(|e| BackendHttpError::not_json("DELETE", endpoint, e))?;
 
-                if body.trim().is_empty() {
+                let trimmed_body = body.trim().to_lowercase();
+                if trimmed_body.is_empty() || trimmed_body == "null" {
                     return Ok(None);
                 }
 

@@ -1,19 +1,23 @@
 use serenity::all::{Context, Interaction};
-use utils::error;
+use utils::{Parser, Pointer, ResponseError};
 
 use crate::{
-    command::{CommandExecution, CommandManager},
+    command::{CommandAction, CommandExecution, CommandManager},
     extractors::ContextExtractor,
 };
 
-pub async fn handle(ctx: &Context, interaction: Interaction) -> Option<String> {
+pub async fn handle(
+    ctx: &Context,
+    interaction: Interaction,
+) -> Result<Option<(String, CommandAction, Pointer<Parser>)>, ResponseError> {
     let Interaction::Command(command) = interaction else {
-        return None;
+        return Ok(None);
     };
 
     let Some(command_manager) = CommandManager::extract_context(ctx).await else {
-        error!("CommandManager not found in TypeMap");
-        return None;
+        return Err(ResponseError::Err(
+            "CommandManager not found in TypeMap".into(),
+        ));
     };
 
     command_manager.execute(ctx, command.clone()).await

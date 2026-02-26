@@ -2,8 +2,8 @@ mod builder;
 mod callback_functions;
 mod functions;
 pub mod response;
-pub use builder::ICommand;
-pub use functions::{CommandAction, CommandCallbackType};
+pub use builder::{CommandBuilder, ICommand};
+pub use functions::*;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use std::{
@@ -113,14 +113,28 @@ impl ContextExtractor for CommandManager {
 
 #[async_trait]
 pub(crate) trait CommandExecution<T> {
-    async fn execute(&self, ctx: &Context, act: T) -> Option<String>;
+    async fn execute(
+        &self,
+        ctx: &Context,
+        act: T,
+    ) -> Result<Option<(String, CommandAction, Pointer<Parser>)>, ResponseError>;
 }
 
 #[async_trait]
 impl CommandExecution<Message> for CommandManager {
-    async fn execute(&self, ctx: &Context, msg: Message) -> Option<String> {
-        let guild_id = msg.guild_id?;
-        let pre_action: CommandAction = CommandAction::from(&msg);
+    async fn execute(
+        &self,
+        ctx: &Context,
+        msg: Message,
+    ) -> Result<Option<(String, CommandAction, Pointer<Parser>)>, ResponseError> {
+        let user_id = msg.author.id;
+        let Some(guild_id) = msg.guild_id else {
+            return Err(ResponseError::Err(format!(
+                "Command in DMs: User {user_id}"
+            )));
+        };
+
+        let pre_action: CommandAction = (&msg).into();
 
         let prefix_option = match Prefix::extract_context_event(ctx, &pre_action).await {
             Some(Prefix(p)) => p.make_clone().await,
@@ -132,13 +146,13 @@ impl CommandExecution<Message> for CommandManager {
             None => {
                 let DefaultPrefix(dp) = DefaultPrefix::extract_context(ctx)
                     .await
-                    .unwrap_or(DefaultPrefix("!".to_string()));
+                    .unwrap_or(DefaultPrefix("!".into()));
                 dp
             }
         };
 
         if !msg.content.starts_with(&prefix) {
-            return None;
+            return Ok(None);
         }
 
         let (mut command_name, mut content) = {
@@ -153,7 +167,12 @@ impl CommandExecution<Message> for CommandManager {
             (command_name, content)
         };
 
-        let guild_map = GuildMap::extract_context_event(ctx, &pre_action).await?;
+        let Some(guild_map) = GuildMap::extract_context_event(ctx, &pre_action).await else {
+            return Err(ResponseError::Err(format!(
+                "Failed to extract GuildMap for guild {guild_id} for command execution"
+            )));
+        };
+
         if let Some(command_aliases) = (guild_map.read().await)
             .get::<CommandAliases>()
             .map(CommandAliases::from)
@@ -169,46 +188,49 @@ impl CommandExecution<Message> for CommandManager {
             new_msg
         };
 
-        let action = CommandAction::from(&new_msg);
+        let action: CommandAction = (&new_msg).into();
 
-        let command = self.0.get(&command_name)?;
+        // * Get the command from the CommandManager
+        let Some(command) = self.0.get(&command_name) else {
+            return Err(ResponseError::Warn(format!(
+                "Command '{}' not found for user {user_id} in guild {guild_id}",
+                command_name
+            )));
+        };
 
-        let callbacks = &command.callbacks;
+        let command_prefix_print = format!("Command '{command_name}':");
 
         // Get the member who sent the command
         let Some(member) = (match Members::extract_context_event(ctx, &action).await {
-            Some(members) => members.fetch(&ctx.http, (guild_id, msg.author.id)).await,
+            Some(members) => members.fetch(&ctx.http, (guild_id, user_id)).await,
             None => None,
         }) else {
-            error!(
-                "Failed to extract Member {} in guild {} for command '{}'",
-                msg.author.id, guild_id, command_name
-            );
-            return None;
+            return Err(ResponseError::Err(format!(
+                "{command_prefix_print} Failed to extract Member {user_id} in guild {guild_id}",
+            )));
         };
 
         // Get the guild
         let guild = match Pointer::<PartialGuild>::extract_context_event(ctx, &action).await {
             Some(guild_ptr) => guild_ptr.make_clone().await,
             None => {
-                error!(
-                    "Failed to extract Guild {} for command '{}'",
-                    guild_id, command_name
-                );
-                return None;
+                return Err(ResponseError::Err(format!(
+                    "{command_prefix_print} Failed to extract Guild {guild_id}"
+                )));
             }
         };
 
         // ProcessManager for handling cooldowns and ephemerals
         let Some(p_manager) = Arc::<ProcessManager>::extract_context(ctx).await else {
-            error!("Failed to extract ProcessManager from context");
-            return None;
+            return Err(ResponseError::Err(format!(
+                "{command_prefix_print} Failed to extract ProcessManager from context"
+            )));
         };
 
         if guild.owner_id != member.user.id
             && let Some(fake_perms) = FakePerms::extract_context_event(ctx, &action).await
             && let Some(missing_perms) = fake_perms
-                .member_lacks_permission(&member, &command.permissions)
+                .member_lacks_permission(&member, command.permissions())
                 .await
         {
             let text = if missing_perms.len() == 1 {
@@ -223,27 +245,26 @@ impl CommandExecution<Message> for CommandManager {
                 .collect::<Vec<String>>()
                 .join(", ");
 
-            let response = create_error_embed(ResponseError::Warn(format!(
-                "{}: You're **missing** {}{}",
-                member.user.id.mention(),
-                text,
-                missing_perms_str
-            )));
+            let response = ResponseError::Warn(format!(
+                "{}: You're **missing** {text}{missing_perms_str}",
+                user_id.mention(),
+            ));
+            let response = create_error_embed(response);
 
             send_message(&ctx.http, &p_manager, &response, &msg);
-            return Some(command_name);
+            return Err(ResponseError::Warn(format!(
+                "{command_prefix_print} User {user_id} is missing permissions in guild {guild_id}: {missing_perms_str}"
+            )));
         }
 
-        if let Some(cooldown_num) = command.cooldown
+        if let Some(cooldown_num) = command.cooldown()
             && let Some(cooldowns) = p_manager.get::<Cooldowns>()
         {
-            let cooldown = Cooldown::Command(guild_id, msg.author.id, command_name.clone());
+            let cooldown = Cooldown::Command(guild_id, user_id, command_name.clone());
             if (cooldowns.0.read().await).get(&cooldown).is_some() {
-                debug!(
-                    "Command '{}' is on cooldown for user {} in guild {}",
-                    command_name, msg.author.id, guild_id
-                );
-                return Some(command_name);
+                return Err(ResponseError::Warn(format!(
+                    "{command_prefix_print} cooldown for user {user_id} in guild {guild_id}"
+                )));
             } else {
                 (cooldowns.0.write().await).insert(
                     cooldown,
@@ -252,27 +273,39 @@ impl CommandExecution<Message> for CommandManager {
             }
         }
         let parser = Pointer::new(Parser::new(ctx.shard_id));
-        for callback in callbacks.iter() {
-            if let CommandCallbackType::Legacy(func) = callback
-                && let Some(response) = func.call(ctx, &action, &parser).await
-            {
-                send_message(&ctx.http, &p_manager, &response, &msg);
-            };
+        if let Some(func) = command.legacy()
+            && let Some(response) = func.call(ctx, &action, &parser).await
+        {
+            send_message(&ctx.http, &p_manager, &response, &msg);
         }
-        Some(command_name)
+        Ok(Some((command_name, action, parser.clone())))
     }
 }
 
 #[async_trait]
 impl CommandExecution<CommandInteraction> for CommandManager {
-    async fn execute(&self, ctx: &Context, interaction: CommandInteraction) -> Option<String> {
-        let guild_id = interaction.guild_id?; // Ensure it's in a guild
+    async fn execute(
+        &self,
+        ctx: &Context,
+        interaction: CommandInteraction,
+    ) -> Result<Option<(String, CommandAction, Pointer<Parser>)>, ResponseError> {
+        let Some(guild_id) = interaction.guild_id else {
+            return Err(ResponseError::Err(format!(
+                "Command in DMs: User {}",
+                interaction.user.id
+            )));
+        };
 
-        let c_name = interaction.data.name.to_lowercase();
-        let action = CommandAction::from(&interaction);
+        let command_name = interaction.data.name.to_lowercase();
 
-        let command = self.0.get(&c_name)?;
+        let Some(command) = self.0.get(&command_name) else {
+            return Err(ResponseError::Warn(format!(
+                "Command '{}' not found for user {} in guild {guild_id}",
+                command_name, interaction.user.id
+            )));
+        };
         let mut parser = Parser::new(ctx.shard_id);
+        let action = CommandAction::from(&interaction);
 
         if let Some(member) = &interaction.member
             && let Some(Members(members)) = Members::extract_context_event(ctx, &action).await
@@ -297,43 +330,42 @@ impl CommandExecution<CommandInteraction> for CommandManager {
             parser.with_channel(None, channel); // Get category from channel later if needed
         }
 
-        let callbacks = &command.callbacks;
         let parser = Pointer::new(parser);
-        for callback in callbacks.iter() {
-            if let CommandCallbackType::Slash(func) = callback
-                && let Some(response) = func.call(ctx, &action, &parser).await
-            {
-                let response_msg: CreateInteractionResponse = match (&response).try_into() {
-                    Ok(m) => m,
-                    Err(e) => {
-                        //This should send the error msg to the channel
-                        error!("Failed to create message from command response: {}", e);
-                        continue;
-                    }
-                };
 
-                let attachments = response.get_attachments().clone();
+        if let Some(func) = command.slash()
+            && let Some(response) = func.call(ctx, &action, &parser).await
+        {
+            let response_msg: CreateInteractionResponse = match (&response).try_into() {
+                Ok(m) => m,
+                Err(e) => {
+                    return Err(ResponseError::Err(format!(
+                        "{command_name}: Failed to create interaction response message:\n{e}",
+                    )));
+                }
+            };
 
-                tokio::spawn({
-                    let http = ctx.http.clone();
-                    let token = interaction.token.clone();
-                    async move {
-                        if let Err(e) = http
-                            .create_interaction_response(
-                                interaction.id,
-                                &token,
-                                &response_msg,
-                                attachments,
-                            )
-                            .await
-                        {
-                            error!("Failed to send command interaction response message: {}", e);
-                        }
+            let attachments = response.get_attachments().clone();
+
+            tokio::spawn({
+                let http = ctx.http.clone();
+                let token = interaction.token.clone();
+                let command_name = command_name.clone();
+                async move {
+                    if let Err(e) = http
+                        .create_interaction_response(
+                            interaction.id,
+                            &token,
+                            &response_msg,
+                            attachments,
+                        )
+                        .await
+                    {
+                        error!("{command_name}: interaction response failed:\n{}", e);
                     }
-                });
-            }
+                }
+            });
         }
-        Some(c_name)
+        Ok(Some((command_name, action, parser.clone())))
     }
 }
 

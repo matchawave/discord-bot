@@ -15,6 +15,7 @@ use tokio::sync::mpsc::{self, Receiver, Sender};
 use utils::{DiscordEvent, ElapsedTime, Parser, Pointer, ResponseError, error, info, warning};
 
 use crate::{
+    command::{CommandAction, CommandEvent},
     extractors::ExtractorTuple,
     handler::{CallbackReturn, DynCallback, HandlerBuilder, HandlerFn},
 };
@@ -22,30 +23,50 @@ use crate::{
 pub type EventResult = Result<Option<()>, ResponseError>;
 
 type EventCallbacks = Vec<Box<dyn DynCallback<Event, EventResult> + Send + Sync>>;
-type CallbackMap = HashMap<DiscordEvent, EventCallbacks>;
+type CommandEventCallbacks = Vec<Box<dyn DynCallback<CommandEvent, EventResult> + Send + Sync>>;
+type CallbackMap<T> = HashMap<DiscordEvent, T>;
 
 #[derive(Default)]
-pub struct EventManagerBuilder(CallbackMap);
+pub struct EventManagerBuilder {
+    event_callbacks: CallbackMap<EventCallbacks>,
+    command_callbacks: CommandEventCallbacks,
+}
 
 impl EventManagerBuilder {
     #[warn(private_bounds)]
-    pub fn add_handler<F, U, Args>(mut self, event: DiscordEvent, callback: F) -> Self
+    pub fn add_event<F, U, Args>(mut self, event: DiscordEvent, callback: F) -> Self
     where
         F: HandlerFn<Args, U> + Send + Sync + Copy + 'static,
         Args: ExtractorTuple<Event> + Send + Sync + 'static,
         U: CallbackReturn<EventResult> + 'static,
     {
         let handler = HandlerBuilder::<Event, U>::build(callback);
-        self.0.entry(event).or_default().push(Box::new(handler));
+        self.event_callbacks
+            .entry(event)
+            .or_default()
+            .push(Box::new(handler));
+        self
+    }
+
+    #[warn(private_bounds)]
+    pub fn add_command<F, U, Args>(mut self, callback: F) -> Self
+    where
+        F: HandlerFn<Args, U> + Send + Sync + Copy + 'static,
+        Args: ExtractorTuple<CommandEvent> + Send + Sync + 'static,
+        U: CallbackReturn<EventResult> + 'static,
+    {
+        let handler = HandlerBuilder::<CommandEvent, U>::build(callback);
+        self.command_callbacks.push(Box::new(handler));
         self
     }
 
     pub fn build(self, shard_count: usize) -> EventManager {
         let mut senders = Vec::with_capacity(shard_count);
-        let callbacks = Arc::new(self.0);
+        let events = Arc::new(self.event_callbacks);
+        let commands = Arc::new(self.command_callbacks);
         for _ in 0..shard_count {
             let (send, recv) = mpsc::channel(10_000);
-            tokio::spawn(worker(recv, callbacks.clone()));
+            tokio::spawn(worker(recv, events.clone(), commands.clone()));
             senders.push(send);
         }
         EventManager(senders)
@@ -66,7 +87,11 @@ impl RawEventHandler for EventManager {
     }
 }
 
-async fn worker(mut receiver: Receiver<(Context, Event)>, callbacks: Arc<CallbackMap>) {
+async fn worker(
+    mut receiver: Receiver<(Context, Event)>,
+    events: Arc<CallbackMap<EventCallbacks>>,
+    commands: Arc<CommandEventCallbacks>,
+) {
     while let Some((ctx, event)) = receiver.recv().await {
         let shard_text = format!("(Shard {})", ctx.shard_id.get()).bold().purple();
         let seperator = "|".bold().white();
@@ -78,13 +103,35 @@ async fn worker(mut receiver: Receiver<(Context, Event)>, callbacks: Arc<Callbac
         update_bot(&ctx, &event).await;
         cache_guild(&ctx, &event).await;
 
-        if command_event(&ctx, &event).await {
-            continue;
+        match command_event(&ctx, &event).await {
+            Ok(Some((name, action, parser))) => {
+                let command_event = CommandEvent { name, action };
+                for func in commands.iter() {
+                    if let Some(Err(result)) = func.call(&ctx, &command_event, &parser).await {
+                        match result {
+                            ResponseError::Err(e) => error!("Command event: {e}"),
+                            ResponseError::Warn(e) => warning!("Command event: {e}"),
+                            ResponseError::Info(e) => info!("Command event: {e}"),
+                        }
+                    }
+                }
+                continue;
+            }
+            Ok(None) => {} // Not a command event, continue with normal processing
+            Err(e) => match e {
+                ResponseError::Err(e) => {
+                    error!("{e}");
+                    continue;
+                }
+
+                ResponseError::Warn(e) => warning!("Warning handling command event: {e}"),
+                _ => {}
+            },
         }
 
         notify_startup(&ctx, &event).await;
         let name = DiscordEvent::from(&event);
-        if let Some(funcs) = callbacks.get(&name)
+        if let Some(funcs) = events.get(&name)
             && !funcs.is_empty()
         {
             let elapsed = ElapsedTime::new();
@@ -121,22 +168,16 @@ async fn worker(mut receiver: Receiver<(Context, Event)>, callbacks: Arc<Callbac
     }
 }
 
-async fn command_event(ctx: &Context, event: &Event) -> bool {
-    let elapsed = ElapsedTime::new();
-    if let Some(command_name) = match event {
+async fn command_event(
+    ctx: &Context,
+    event: &Event,
+) -> Result<Option<(String, CommandAction, Pointer<Parser>)>, ResponseError> {
+    match event {
         Event::MessageCreate(e) => message::handle_command(ctx, e.message.clone()).await,
         Event::MessageUpdate(e) => message::handle_edited_command(ctx, e).await,
         Event::InteractionCreate(e) => interactions::handle(ctx, e.interaction.clone()).await,
-        _ => None,
-    } {
-        info!(
-            "command {} handled in {:?}ms",
-            command_name,
-            elapsed.elapsed_ms()
-        );
-        return true;
+        _ => Ok(None),
     }
-    false
 }
 
 async fn notify_startup(ctx: &Context, event: &Event) {

@@ -1,5 +1,5 @@
 use framework::{
-    command::{CommandCallbackType as CCT, CommandResult, ICommand},
+    command::{CommandBuilder, CommandResult, ICommand},
     extractors::InteractionOptions,
 };
 use serenity::all::{
@@ -23,10 +23,12 @@ pub fn command() -> ICommand {
     )
     .max_int_value(10)
     .min_int_value(1);
-    ICommand::new(NAME, DESCRIPTION)
+    CommandBuilder::default()
         .options(vec![index_option])
         .permissions(vec![BotPermission::ManageMessages])
-        .callbacks(vec![CCT::slash(interaction), CCT::legacy(legacy)])
+        .slash(interaction)
+        .legacy(legacy)
+        .build(NAME, DESCRIPTION)
 }
 
 async fn interaction(
@@ -83,7 +85,7 @@ async fn execute(
             None => {
                 return Ok(Some(no_snipes!(
                     Colour::BLITZ_BLUE,
-                    "{}: No **edited message** found at index `{}`",
+                    "{}: No **deleted message** found at index `{}`",
                     member.user.id.mention().to_string(),
                     index,
                 )));
