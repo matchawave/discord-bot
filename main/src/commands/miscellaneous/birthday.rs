@@ -11,10 +11,6 @@ use utils::ResponseError;
 const NAME: &str = "birthday";
 const DESCRIPTION: &str = "Set your birthday and get a surprise on your special day!";
 
-const DATE_FORMATS: [&str; 8] = [
-    "%m-%d", "%Y-%m-%d", "%m/%d", "%Y/%m/%d", "%m.%d", "%Y.%m.%d", "%Y%m%d", "%m%d",
-];
-
 pub fn command() -> ICommand {
     let date_option = CreateCommandOption::new(
         CommandOptionType::String,
