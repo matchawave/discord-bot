@@ -10,7 +10,7 @@ use utils::{HttpType, Pointer, error};
 
 use crate::{
     ShardData,
-    command::CommandAction,
+    command::CommandEvent,
     extractors::{ContextEventExtractor, EventExtractor, Extractor},
     guilds::HTTPGetter,
 };
@@ -123,12 +123,8 @@ impl Extractor<Event> for GuildChannel {
 }
 
 #[async_trait]
-impl Extractor<CommandAction> for GuildChannel {
-    async fn extract(
-        ctx: &Context,
-        ev: &CommandAction,
-        _: &Pointer<utils::Parser>,
-    ) -> Option<Self> {
+impl Extractor<CommandEvent> for GuildChannel {
+    async fn extract(ctx: &Context, ev: &CommandEvent, _: &Pointer<utils::Parser>) -> Option<Self> {
         GuildChannel::extract_context_event(ctx, ev).await
     }
 }

@@ -2,14 +2,14 @@ use serenity::all::{Context, Interaction};
 use utils::{Parser, Pointer, ResponseError};
 
 use crate::{
-    command::{CommandAction, CommandExecution, CommandManager},
+    command::{CommandEvent, CommandExecution, CommandManager},
     extractors::ContextExtractor,
 };
 
 pub async fn handle(
     ctx: &Context,
     interaction: Interaction,
-) -> Result<Option<(String, CommandAction, Pointer<Parser>)>, ResponseError> {
+) -> Result<Option<(CommandEvent, Pointer<Parser>)>, ResponseError> {
     let Interaction::Command(command) = interaction else {
         return Ok(None);
     };

@@ -194,6 +194,28 @@ impl std::fmt::Display for ResponseError {
     }
 }
 
+impl Debug for ResponseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ResponseError::Err(msg) => write!(f, "Error: {}", msg),
+            ResponseError::Warn(msg) => write!(f, "Warning: {}", msg),
+            ResponseError::Info(msg) => write!(f, "Info: {}", msg),
+        }
+    }
+}
+
+impl From<String> for ResponseError {
+    fn from(value: String) -> Self {
+        Self::Err(value)
+    }
+}
+
+impl From<&str> for ResponseError {
+    fn from(value: &str) -> Self {
+        Self::Err(value.into())
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct MemberData {
     pub is_bot: bool,

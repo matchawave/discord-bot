@@ -15,7 +15,7 @@ use tokio::sync::mpsc::{self, Receiver, Sender};
 use utils::{DiscordEvent, ElapsedTime, Parser, Pointer, ResponseError, error, info, warning};
 
 use crate::{
-    command::{CommandAction, CommandEvent},
+    command::CommandEvent,
     extractors::ExtractorTuple,
     handler::{CallbackReturn, DynCallback, HandlerBuilder, HandlerFn},
 };
@@ -104,8 +104,7 @@ async fn worker(
         cache_guild(&ctx, &event).await;
 
         match command_event(&ctx, &event).await {
-            Ok(Some((name, action, parser))) => {
-                let command_event = CommandEvent { name, action };
+            Ok(Some((command_event, parser))) => {
                 for func in commands.iter() {
                     if let Some(Err(result)) = func.call(&ctx, &command_event, &parser).await {
                         match result {
@@ -171,7 +170,7 @@ async fn worker(
 async fn command_event(
     ctx: &Context,
     event: &Event,
-) -> Result<Option<(String, CommandAction, Pointer<Parser>)>, ResponseError> {
+) -> Result<Option<(CommandEvent, Pointer<Parser>)>, ResponseError> {
     match event {
         Event::MessageCreate(e) => message::handle_command(ctx, e.message.clone()).await,
         Event::MessageUpdate(e) => message::handle_edited_command(ctx, e).await,

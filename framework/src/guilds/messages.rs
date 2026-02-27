@@ -10,7 +10,7 @@ use utils::{HttpType, Parser, Pointer, debug, error};
 
 use crate::{
     ShardData,
-    command::CommandAction,
+    command::{CommandAction, CommandEvent},
     extractors::{ContextEventExtractor, EventExtractor, Extractor},
     guilds::HTTPGetter,
 };
@@ -129,9 +129,9 @@ where
 }
 
 #[async_trait]
-impl Extractor<CommandAction> for Message {
-    async fn extract(_ctx: &Context, action: &CommandAction, _p: &Pointer<Parser>) -> Option<Self> {
-        if let CommandAction::Message(msg) = action {
+impl Extractor<CommandEvent> for Message {
+    async fn extract(_ctx: &Context, action: &CommandEvent, _p: &Pointer<Parser>) -> Option<Self> {
+        if let CommandAction::Message(msg) = &action.action {
             return Some(*msg.clone());
         }
         None

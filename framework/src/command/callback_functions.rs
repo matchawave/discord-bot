@@ -26,6 +26,16 @@ impl CallbackReturn<CommandResponse> for CommandResult<CommandResponse> {
     }
 }
 
+impl CallbackReturn<CommandResponse> for CommandResult<String> {
+    fn into_response(self: Box<Self>) -> Option<CommandResponse> {
+        match *self {
+            Ok(Some(response)) => Some(CommandResponse::new(response).reply()),
+            Ok(None) => None,
+            Err(e) => Some(create_error_embed(e)),
+        }
+    }
+}
+
 impl CallbackReturn<CommandResponse> for CommandResult<CreateEmbed> {
     fn into_response(self: Box<Self>) -> Option<CommandResponse> {
         match *self {

@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use serde::{Deserialize, Serialize};
 use serenity::{
     all::{CommandInteraction, Context, Message},
@@ -7,15 +5,10 @@ use serenity::{
 };
 use utils::{Parser, Pointer};
 
-use crate::{
-    command::response::CommandResponse,
-    extractors::{EventExtractor, Extractor, ExtractorTuple},
-    handler::{CallbackReturn, DynCallback, DynHandler, HandlerBuilder, HandlerFn},
-};
+use crate::extractors::{EventExtractor, Extractor};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CommandAction {
-    // Name of the command, and the event that triggered it
     Interaction(Box<CommandInteraction>),
     Message(Box<Message>),
 }
@@ -38,44 +31,12 @@ impl From<&CommandInteraction> for CommandAction {
     }
 }
 
-type CommandCallback = Arc<dyn DynCallback<CommandAction, CommandResponse>>;
-
-#[derive(Clone)]
-pub enum CommandCallbackType {
-    Slash(CommandCallback),
-    Legacy(CommandCallback),
-    Autocomplete(Arc<dyn DynHandler<CommandAction, Output = Vec<String>>>),
-    User(CommandCallback),
-    Message(CommandCallback),
-}
-impl CommandCallbackType {
-    pub fn slash<F, U, Args>(func: F) -> Self
-    where
-        F: HandlerFn<Args, U> + Send + Sync + Copy + 'static,
-        Args: ExtractorTuple<CommandAction> + Send + Sync + 'static,
-        U: CallbackReturn<CommandResponse> + 'static,
-    {
-        let handler = HandlerBuilder::<CommandAction, U>::build(func);
-        CommandCallbackType::Slash(Arc::new(handler))
-    }
-
-    pub fn legacy<F, U, Args>(func: F) -> Self
-    where
-        F: HandlerFn<Args, U> + Send + Sync + Copy + 'static,
-        Args: ExtractorTuple<CommandAction> + Send + Sync + 'static,
-        U: CallbackReturn<CommandResponse> + 'static,
-    {
-        let handler = HandlerBuilder::<CommandAction, U>::build(func);
-        CommandCallbackType::Legacy(Arc::new(handler))
-    }
-
-    pub fn autocomplete<F, Args>(func: F) -> Self
-    where
-        F: HandlerFn<Args, Vec<String>> + Send + Sync + Copy + 'static,
-        Args: ExtractorTuple<CommandAction> + Send + Sync + 'static,
-    {
-        let handler = HandlerBuilder::<CommandAction, Vec<String>>::build(func);
-        CommandCallbackType::Autocomplete(Arc::new(handler))
+impl From<&Message> for CommandEvent {
+    fn from(message: &Message) -> Self {
+        CommandEvent {
+            name: message.content.clone(), // You might want to parse the command name properly
+            action: CommandAction::from(message),
+        }
     }
 }
 

@@ -1,12 +1,12 @@
 use serenity::{
-    all::{Context, Event, User},
+    all::{Context, User},
     async_trait,
     prelude::TypeMapKey,
 };
 
 use utils::{DataType, Parser, Pointer};
 
-use crate::{command::CommandAction, extractors::Extractor};
+use crate::extractors::{ContextExtractor, Extractor};
 
 struct Bot;
 impl TypeMapKey for Bot {
@@ -31,15 +31,18 @@ impl CurrentBot {
 }
 
 #[async_trait]
-impl Extractor<Event> for CurrentBot {
-    async fn extract(ctx: &Context, _e: &Event, _p: &Pointer<Parser>) -> Option<Self> {
+impl ContextExtractor for CurrentBot {
+    async fn extract_context(ctx: &Context) -> Option<Self> {
         CurrentBot::get(&ctx.data).await.map(CurrentBot)
     }
 }
 
 #[async_trait]
-impl Extractor<CommandAction> for CurrentBot {
-    async fn extract(ctx: &Context, _a: &CommandAction, _p: &Pointer<Parser>) -> Option<Self> {
-        CurrentBot::get(&ctx.data).await.map(CurrentBot)
+impl<T> Extractor<T> for CurrentBot
+where
+    T: Send + Sync,
+{
+    async fn extract(ctx: &Context, _e: &T, _p: &Pointer<Parser>) -> Option<Self> {
+        Self::extract_context(ctx).await
     }
 }

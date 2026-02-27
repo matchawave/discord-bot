@@ -38,6 +38,8 @@ pub fn create_event_handler(shard_count: usize) -> EventManager {
         .add_event(DiscordEvent::MessageCreate, message::afk::check_mentions)
         // Logs
         .add_event(DiscordEvent::MessageUpdate, message::logs::update)
+        //Commands
+        .add_command(message::afk::cmd_check)
         // Build and return
         .build(shard_count)
 }

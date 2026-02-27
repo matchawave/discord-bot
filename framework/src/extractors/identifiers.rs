@@ -5,7 +5,7 @@ use serenity::{
 use utils::{Parser, Pointer};
 
 use crate::{
-    command::CommandAction,
+    command::{CommandAction, CommandEvent},
     extractors::{ContextExtractor, EventExtractor, Extractor},
 };
 
@@ -83,9 +83,9 @@ impl EventExtractor<Event> for GuildId {
 }
 
 #[async_trait]
-impl EventExtractor<CommandAction> for GuildId {
-    async fn extract_event(action: &CommandAction) -> Option<Self> {
-        match action {
+impl EventExtractor<CommandEvent> for GuildId {
+    async fn extract_event(action: &CommandEvent) -> Option<Self> {
+        match &action.action {
             CommandAction::Interaction(i) => i.guild_id,
             CommandAction::Message(m) => m.guild_id,
         }
@@ -122,9 +122,9 @@ impl EventExtractor<Event> for ChannelId {
 }
 
 #[async_trait]
-impl EventExtractor<CommandAction> for ChannelId {
-    async fn extract_event(ev: &CommandAction) -> Option<Self> {
-        match ev {
+impl EventExtractor<CommandEvent> for ChannelId {
+    async fn extract_event(ev: &CommandEvent) -> Option<Self> {
+        match &ev.action {
             CommandAction::Message(m) => Some(m.channel_id),
             CommandAction::Interaction(i) => Some(i.channel_id),
         }
@@ -169,9 +169,9 @@ impl EventExtractor<Event> for Vec<MessageId> {
 }
 
 #[async_trait]
-impl EventExtractor<CommandAction> for MessageId {
-    async fn extract_event(action: &CommandAction) -> Option<Self> {
-        match action {
+impl EventExtractor<CommandEvent> for MessageId {
+    async fn extract_event(action: &CommandEvent) -> Option<Self> {
+        match &action.action {
             CommandAction::Message(m) => Some(m.id),
             _ => None,
         }
@@ -208,9 +208,9 @@ impl EventExtractor<Event> for UserId {
 }
 
 #[async_trait]
-impl EventExtractor<CommandAction> for UserId {
-    async fn extract_event(action: &CommandAction) -> Option<Self> {
-        match action {
+impl EventExtractor<CommandEvent> for UserId {
+    async fn extract_event(action: &CommandEvent) -> Option<Self> {
+        match &action.action {
             CommandAction::Message(m) => Some(m.author.id),
             CommandAction::Interaction(i) => Some(i.user.id),
         }

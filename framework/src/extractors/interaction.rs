@@ -4,12 +4,15 @@ use serenity::{
 };
 use utils::{Parser, Pointer};
 
-use crate::{command::CommandAction, extractors::Extractor};
+use crate::{
+    command::{CommandAction, CommandEvent},
+    extractors::Extractor,
+};
 
 #[async_trait]
-impl Extractor<CommandAction> for CommandInteraction {
-    async fn extract(_ctx: &Context, action: &CommandAction, _p: &Pointer<Parser>) -> Option<Self> {
-        match action {
+impl Extractor<CommandEvent> for CommandInteraction {
+    async fn extract(_ctx: &Context, action: &CommandEvent, _p: &Pointer<Parser>) -> Option<Self> {
+        match &action.action {
             CommandAction::Interaction(interaction) => Some(*interaction.clone()),
             _ => None,
         }

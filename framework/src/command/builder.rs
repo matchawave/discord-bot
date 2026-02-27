@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
-    command::{CommandAction, response::CommandResponse},
+    command::{CommandEvent, response::CommandResponse},
     extractors::ExtractorTuple,
     handler::{CallbackReturn, DynCallback, DynHandler, HandlerBuilder, HandlerFn},
 };
@@ -140,8 +140,8 @@ impl TryInto<Vec<CreateCommand>> for &ICommand {
     }
 }
 
-type CommandCallback<T> = Arc<dyn DynCallback<CommandAction, T>>;
-type AutocompleteCallback = Arc<dyn DynHandler<CommandAction, Output = Vec<String>>>;
+type CommandCallback<T> = Arc<dyn DynCallback<CommandEvent, T>>;
+type AutocompleteCallback = Arc<dyn DynHandler<CommandEvent, Output = Vec<String>>>;
 
 #[derive(Default)]
 pub struct CommandBuilder {
@@ -174,29 +174,29 @@ impl CommandBuilder {
     pub fn slash<F, U, Args>(mut self, func: F) -> Self
     where
         F: HandlerFn<Args, U> + Send + Sync + Copy + 'static,
-        Args: ExtractorTuple<CommandAction> + Send + Sync + 'static,
+        Args: ExtractorTuple<CommandEvent> + Send + Sync + 'static,
         U: CallbackReturn<CommandResponse> + 'static,
     {
-        self.slash_callback = Some(Arc::new(HandlerBuilder::<CommandAction, U>::build(func)));
+        self.slash_callback = Some(Arc::new(HandlerBuilder::<CommandEvent, U>::build(func)));
         self
     }
 
     pub fn legacy<F, U, Args>(mut self, func: F) -> Self
     where
         F: HandlerFn<Args, U> + Send + Sync + Copy + 'static,
-        Args: ExtractorTuple<CommandAction> + Send + Sync + 'static,
+        Args: ExtractorTuple<CommandEvent> + Send + Sync + 'static,
         U: CallbackReturn<CommandResponse> + 'static,
     {
-        self.legacy_callback = Some(Arc::new(HandlerBuilder::<CommandAction, U>::build(func)));
+        self.legacy_callback = Some(Arc::new(HandlerBuilder::<CommandEvent, U>::build(func)));
         self
     }
 
     pub fn autocomplete<F, Args>(mut self, func: F) -> Self
     where
         F: HandlerFn<Args, Vec<String>> + Send + Sync + Copy + 'static,
-        Args: ExtractorTuple<CommandAction> + Send + Sync + 'static,
+        Args: ExtractorTuple<CommandEvent> + Send + Sync + 'static,
     {
-        let handler = HandlerBuilder::<CommandAction, Vec<String>>::build(func);
+        let handler = HandlerBuilder::<CommandEvent, Vec<String>>::build(func);
         self.autocomplete_callback = Some(Arc::new(handler));
         self
     }

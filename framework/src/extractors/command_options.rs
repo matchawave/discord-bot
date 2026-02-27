@@ -6,7 +6,10 @@ use serenity::{
 };
 use utils::{Parser, Pointer};
 
-use crate::{command::CommandAction, extractors::Extractor};
+use crate::{
+    command::{CommandAction, CommandEvent},
+    extractors::Extractor,
+};
 
 pub struct InteractionOptions(HashMap<String, CommandDataOptionValue>);
 
@@ -17,9 +20,9 @@ impl InteractionOptions {
 }
 
 #[async_trait]
-impl Extractor<CommandAction> for Vec<String> {
-    async fn extract(_ctx: &Context, ev: &CommandAction, _p: &Pointer<Parser>) -> Option<Self> {
-        if let CommandAction::Message(msg) = ev {
+impl Extractor<CommandEvent> for Vec<String> {
+    async fn extract(_ctx: &Context, ev: &CommandEvent, _p: &Pointer<Parser>) -> Option<Self> {
+        if let CommandAction::Message(msg) = &ev.action {
             return Some(
                 msg.content
                     .split_whitespace()
@@ -32,9 +35,9 @@ impl Extractor<CommandAction> for Vec<String> {
 }
 
 #[async_trait]
-impl Extractor<CommandAction> for InteractionOptions {
-    async fn extract(_ctx: &Context, ev: &CommandAction, _p: &Pointer<Parser>) -> Option<Self> {
-        if let CommandAction::Interaction(interaction) = ev {
+impl Extractor<CommandEvent> for InteractionOptions {
+    async fn extract(_ctx: &Context, ev: &CommandEvent, _p: &Pointer<Parser>) -> Option<Self> {
+        if let CommandAction::Interaction(interaction) = &ev.action {
             let mut map = HashMap::new();
 
             for option in &interaction.data.options {

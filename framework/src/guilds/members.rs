@@ -10,7 +10,7 @@ use utils::{HttpType, Parser, Pointer, error};
 
 use crate::{
     ShardData,
-    command::CommandAction,
+    command::CommandEvent,
     extractors::{ContextEventExtractor, EventExtractor, Extractor},
     guilds::HTTPGetter,
 };
@@ -94,8 +94,8 @@ where
 }
 
 #[async_trait]
-impl Extractor<CommandAction> for Member {
-    async fn extract(ctx: &Context, action: &CommandAction, _: &Pointer<Parser>) -> Option<Self> {
+impl Extractor<CommandEvent> for Member {
+    async fn extract(ctx: &Context, action: &CommandEvent, _: &Pointer<Parser>) -> Option<Self> {
         let guild_id = GuildId::extract_event(action).await?;
         let user_id = UserId::extract_event(action).await?;
         let members = Members::extract_context_event(ctx, action).await?;

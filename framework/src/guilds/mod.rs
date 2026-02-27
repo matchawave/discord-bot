@@ -22,7 +22,7 @@ use utils::{HttpType, Parser, Pointer, error};
 
 use crate::{
     Extractable, ShardData,
-    command::CommandAction,
+    command::CommandEvent,
     data::Prefix,
     extractors::{ContextEventExtractor, ContextExtractor, EventExtractor, Extractor},
 };
@@ -257,19 +257,19 @@ where
 }
 
 #[async_trait]
-impl<CommandAction> Extractor<CommandAction> for Pointer<PartialGuild>
+impl<T> Extractor<T> for Pointer<PartialGuild>
 where
-    CommandAction: Send + Sync + 'static,
-    GuildId: EventExtractor<CommandAction>,
+    T: Send + Sync + 'static,
+    GuildId: EventExtractor<T>,
 {
-    async fn extract(ctx: &Context, action: &CommandAction, _: &Pointer<Parser>) -> Option<Self> {
+    async fn extract(ctx: &Context, action: &T, _: &Pointer<Parser>) -> Option<Self> {
         Pointer::<PartialGuild>::extract_context_event(ctx, action).await
     }
 }
 
 #[async_trait]
-impl Extractor<CommandAction> for PartialGuild {
-    async fn extract(ctx: &Context, action: &CommandAction, p: &Pointer<Parser>) -> Option<Self> {
+impl Extractor<CommandEvent> for PartialGuild {
+    async fn extract(ctx: &Context, action: &CommandEvent, p: &Pointer<Parser>) -> Option<Self> {
         let ptr = Pointer::<PartialGuild>::extract(ctx, action, p).await?;
         Some(ptr.make_clone().await)
     }

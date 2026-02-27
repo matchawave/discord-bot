@@ -185,6 +185,15 @@ async fn legacy(
     cache: GlobalCache<AfkConfig>,
 ) -> CommandResult<CreateEmbed> {
     let user_id = member.user.id;
+
+    // Check if user is already AFK in this guild or globally
+    if map.contains_user(user_id).await {
+        return Err(ResponseError::Err(format!(
+            "{}: You are already AFK",
+            user_id.mention()
+        )));
+    }
+
     let config = get_user_config(user_id, cache, &backend_http).await?;
 
     let (per_guild, default_reason) = if let Some(config) = config {

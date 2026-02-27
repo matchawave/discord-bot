@@ -5,6 +5,7 @@ use std::{
 
 use chrono::DateTime;
 use framework::{
+    command::CommandName,
     data::{Ephemeral, Ephemerals},
     event::EventResult,
     global::GlobalMap,
@@ -31,6 +32,56 @@ pub async fn check(
     http: HttpType,
     backend_http: BackendHttp,
 ) -> EventResult {
+    check_function(
+        guild_id,
+        channel_id,
+        Some(message),
+        user_id,
+        map,
+        ephemerals,
+        http,
+        backend_http,
+    )
+    .await
+}
+
+pub async fn cmd_check(
+    CommandName(cmd_name): CommandName,
+    guild_id: GuildId,
+    channel_id: ChannelId,
+    user_id: UserId,
+    map: GlobalMap<AfkStatus>,
+    ephemerals: Arc<Ephemerals>,
+    http: HttpType,
+    backend_http: BackendHttp,
+) -> EventResult {
+    if cmd_name == "afk" {
+        return Ok(None); // Don't check AFK status on the AFK command itself
+    }
+    check_function(
+        guild_id,
+        channel_id,
+        None, // No message reference for command checks
+        user_id,
+        map,
+        ephemerals,
+        http,
+        backend_http,
+    )
+    .await
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn check_function(
+    guild_id: GuildId,
+    channel_id: ChannelId,
+    message: Option<Message>,
+    user_id: UserId,
+    map: GlobalMap<AfkStatus>,
+    ephemerals: Arc<Ephemerals>,
+    http: HttpType,
+    backend_http: BackendHttp,
+) -> EventResult {
     if let Some(afk_status) = map.remove(Some(guild_id), user_id).await {
         let duration_str = calculate_duration(afk_status.created_at);
 
@@ -44,9 +95,10 @@ pub async fn check(
             .description(content)
             .colour(Colour::LIGHT_GREY);
 
-        let msg = CreateMessage::default()
-            .add_embed(embed)
-            .reference_message(&message);
+        let mut msg = CreateMessage::default().add_embed(embed);
+        if let Some(message) = message {
+            msg = msg.reference_message(&message);
+        }
 
         tokio::spawn(async move {
             let sent_msg = match channel_id.send_message(http, msg).await {

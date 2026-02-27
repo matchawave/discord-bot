@@ -117,7 +117,7 @@ pub(crate) trait CommandExecution<T> {
         &self,
         ctx: &Context,
         act: T,
-    ) -> Result<Option<(String, CommandAction, Pointer<Parser>)>, ResponseError>;
+    ) -> Result<Option<(CommandEvent, Pointer<Parser>)>, ResponseError>;
 }
 
 #[async_trait]
@@ -126,7 +126,7 @@ impl CommandExecution<Message> for CommandManager {
         &self,
         ctx: &Context,
         msg: Message,
-    ) -> Result<Option<(String, CommandAction, Pointer<Parser>)>, ResponseError> {
+    ) -> Result<Option<(CommandEvent, Pointer<Parser>)>, ResponseError> {
         let user_id = msg.author.id;
         let Some(guild_id) = msg.guild_id else {
             return Err(ResponseError::Err(format!(
@@ -135,8 +135,12 @@ impl CommandExecution<Message> for CommandManager {
         };
 
         let pre_action: CommandAction = (&msg).into();
+        let pre_event = CommandEvent {
+            name: "name_not_parsed".into(),
+            action: pre_action.clone(),
+        };
 
-        let prefix_option = match Prefix::extract_context_event(ctx, &pre_action).await {
+        let prefix_option = match Prefix::extract_context_event(ctx, &pre_event).await {
             Some(Prefix(p)) => p.make_clone().await,
             None => None,
         };
@@ -167,7 +171,7 @@ impl CommandExecution<Message> for CommandManager {
             (command_name, content)
         };
 
-        let Some(guild_map) = GuildMap::extract_context_event(ctx, &pre_action).await else {
+        let Some(guild_map) = GuildMap::extract_context_event(ctx, &pre_event).await else {
             return Err(ResponseError::Err(format!(
                 "Failed to extract GuildMap for guild {guild_id} for command execution"
             )));
@@ -189,6 +193,10 @@ impl CommandExecution<Message> for CommandManager {
         };
 
         let action: CommandAction = (&new_msg).into();
+        let event = CommandEvent {
+            name: command_name.clone(),
+            action: action.clone(),
+        };
 
         // * Get the command from the CommandManager
         let Some(command) = self.0.get(&command_name) else {
@@ -201,7 +209,7 @@ impl CommandExecution<Message> for CommandManager {
         let command_prefix_print = format!("Command '{command_name}':");
 
         // Get the member who sent the command
-        let Some(member) = (match Members::extract_context_event(ctx, &action).await {
+        let Some(member) = (match Members::extract_context_event(ctx, &event).await {
             Some(members) => members.fetch(&ctx.http, (guild_id, user_id)).await,
             None => None,
         }) else {
@@ -211,7 +219,7 @@ impl CommandExecution<Message> for CommandManager {
         };
 
         // Get the guild
-        let guild = match Pointer::<PartialGuild>::extract_context_event(ctx, &action).await {
+        let guild = match Pointer::<PartialGuild>::extract_context_event(ctx, &event).await {
             Some(guild_ptr) => guild_ptr.make_clone().await,
             None => {
                 return Err(ResponseError::Err(format!(
@@ -228,7 +236,7 @@ impl CommandExecution<Message> for CommandManager {
         };
 
         if guild.owner_id != member.user.id
-            && let Some(fake_perms) = FakePerms::extract_context_event(ctx, &action).await
+            && let Some(fake_perms) = FakePerms::extract_context_event(ctx, &event).await
             && let Some(missing_perms) = fake_perms
                 .member_lacks_permission(&member, command.permissions())
                 .await
@@ -274,11 +282,12 @@ impl CommandExecution<Message> for CommandManager {
         }
         let parser = Pointer::new(Parser::new(ctx.shard_id));
         if let Some(func) = command.legacy()
-            && let Some(response) = func.call(ctx, &action, &parser).await
+            && let Some(response) = func.call(ctx, &event, &parser).await
         {
             send_message(&ctx.http, &p_manager, &response, &msg);
         }
-        Ok(Some((command_name, action, parser.clone())))
+
+        Ok(Some((event, parser.clone())))
     }
 }
 
@@ -288,7 +297,7 @@ impl CommandExecution<CommandInteraction> for CommandManager {
         &self,
         ctx: &Context,
         interaction: CommandInteraction,
-    ) -> Result<Option<(String, CommandAction, Pointer<Parser>)>, ResponseError> {
+    ) -> Result<Option<(CommandEvent, Pointer<Parser>)>, ResponseError> {
         let Some(guild_id) = interaction.guild_id else {
             return Err(ResponseError::Err(format!(
                 "Command in DMs: User {}",
@@ -306,9 +315,13 @@ impl CommandExecution<CommandInteraction> for CommandManager {
         };
         let mut parser = Parser::new(ctx.shard_id);
         let action = CommandAction::from(&interaction);
+        let event = CommandEvent {
+            name: command_name.clone(),
+            action: action.clone(),
+        };
 
         if let Some(member) = &interaction.member
-            && let Some(Members(members)) = Members::extract_context_event(ctx, &action).await
+            && let Some(Members(members)) = Members::extract_context_event(ctx, &event).await
         {
             let user_id = member.user.id;
             let member = *member.clone();
@@ -318,11 +331,11 @@ impl CommandExecution<CommandInteraction> for CommandManager {
             }
         }
 
-        if let Some(guild) = Pointer::<PartialGuild>::extract_context_event(ctx, &action).await {
+        if let Some(guild) = Pointer::<PartialGuild>::extract_context_event(ctx, &event).await {
             parser.with_guild(guild.make_clone().await);
         }
 
-        if let Some(channels) = Channels::extract_context_event(ctx, &action).await
+        if let Some(channels) = Channels::extract_context_event(ctx, &event).await
             && let Some(channel) = channels
                 .fetch(&ctx.http, (guild_id, interaction.channel_id))
                 .await
@@ -333,7 +346,7 @@ impl CommandExecution<CommandInteraction> for CommandManager {
         let parser = Pointer::new(parser);
 
         if let Some(func) = command.slash()
-            && let Some(response) = func.call(ctx, &action, &parser).await
+            && let Some(response) = func.call(ctx, &event, &parser).await
         {
             let response_msg: CreateInteractionResponse = match (&response).try_into() {
                 Ok(m) => m,
@@ -365,7 +378,7 @@ impl CommandExecution<CommandInteraction> for CommandManager {
                 }
             });
         }
-        Ok(Some((command_name, action, parser.clone())))
+        Ok(Some((event, parser.clone())))
     }
 }
 
