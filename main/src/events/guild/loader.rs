@@ -7,7 +7,7 @@ pub async fn create(shard_id: ShardId, guild_id: GuildId, backend_http: BackendH
     let path = format!("api/guild/{}?shard_id={}", guild_id, shard_id);
     match backend_http.post::<(), ()>(&path, &()).await {
         Ok(_) => info!("Registered guild {guild_id} (Shard {shard_id})"),
-        Err(e) => error!("Failed to register guild {guild_id} (Shard {shard_id}): {e}"),
+        Err(e) => error!("Failed to register guild {guild_id} (Shard {shard_id})\n{e}"),
     }
 }
 

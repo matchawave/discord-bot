@@ -97,7 +97,7 @@ async fn interaction(
     if let Some(CommandDataOptionValue::SubCommand(config_options)) = options.get("config") {
         let new_config_body = AfkCommandConfig::from(config_options);
         if new_config_body.per_guild.is_none() && new_config_body.default_reason.is_none() {
-            return Err(ResponseError::Err(format!(
+            return Err(ResponseError::new_silent(format!(
                 "{}: You must provide at least one option to update your AFK configuration.",
                 user_id.mention()
             )));
@@ -107,14 +107,14 @@ async fn interaction(
         let Some(result): Option<AfkConfigResponse> =
             (backend_http.post(&path, &new_config_body).await).map_err(|e| {
                 error!("Error updating AFK config for user {user_id}: {e}");
-                ResponseError::Err(format!(
+                ResponseError::new_silent(format!(
                     "{}: Failed to update AFK configuration",
                     user_id.mention()
                 ))
             })?
         else {
             error!("No response received when updating AFK config for user {user_id}");
-            return Err(ResponseError::Err(format!(
+            return Err(ResponseError::new_silent(format!(
                 "{}: Failed to update AFK configuration",
                 user_id.mention()
             )));
@@ -188,7 +188,7 @@ async fn legacy(
 
     // Check if user is already AFK in this guild or globally
     if map.contains_user(user_id).await {
-        return Err(ResponseError::Err(format!(
+        return Err(ResponseError::warn(format!(
             "{}: You are already AFK",
             user_id.mention()
         )));
@@ -223,11 +223,11 @@ async fn legacy(
             } else {
                 error!("Error setting global AFK status for user {user_id}: {e}");
             }
-            ResponseError::Err(format!("{}: Failed to set AFK status", user_id.mention()))
+            ResponseError::new_silent(format!("{}: Failed to set AFK status", user_id.mention()))
         })?
     else {
         error!("No response received when setting AFK status for user {user_id}");
-        return Err(ResponseError::Err(format!(
+        return Err(ResponseError::new_silent(format!(
             "{}: Failed to set AFK status",
             user_id.mention()
         )));
@@ -263,7 +263,7 @@ async fn get_user_config(
             }
             Err(e) => {
                 error!("Error fetching AFK config for user {user_id}: {e}");
-                Err(ResponseError::Err(format!(
+                Err(ResponseError::new_silent(format!(
                     "{}: Failed to fetch AFK configuration",
                     user_id.mention()
                 )))

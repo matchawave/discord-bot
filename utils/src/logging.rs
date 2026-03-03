@@ -25,7 +25,7 @@ macro_rules! error {
         let formated_time_date: String = dt.format("%Y-%m-%d %H:%M:%S").to_string();
 
         println!(
-            "{} [{}]: {}",
+            "\n{} [{}]: {}\n",
             formated_time_date,
             "ERROR".red().bold(),
             format!($($arg)*)
@@ -43,7 +43,7 @@ macro_rules! warning {
         let formated_time_date: String = dt.format("%Y-%m-%d %H:%M:%S").to_string();
 
         println!(
-            "{} [{}]: {}",
+            "\n{} [{}]: {}\n",
             formated_time_date,
             "WARN".yellow().bold(),
             format!($($arg)*)

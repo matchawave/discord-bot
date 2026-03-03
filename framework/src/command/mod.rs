@@ -129,7 +129,7 @@ impl CommandExecution<Message> for CommandManager {
     ) -> Result<Option<(CommandEvent, Pointer<Parser>)>, ResponseError> {
         let user_id = msg.author.id;
         let Some(guild_id) = msg.guild_id else {
-            return Err(ResponseError::Err(format!(
+            return Err(ResponseError::new(format!(
                 "Command in DMs: User {user_id}"
             )));
         };
@@ -172,7 +172,7 @@ impl CommandExecution<Message> for CommandManager {
         };
 
         let Some(guild_map) = GuildMap::extract_context_event(ctx, &pre_event).await else {
-            return Err(ResponseError::Err(format!(
+            return Err(ResponseError::new(format!(
                 "Failed to extract GuildMap for guild {guild_id} for command execution"
             )));
         };
@@ -200,9 +200,8 @@ impl CommandExecution<Message> for CommandManager {
 
         // * Get the command from the CommandManager
         let Some(command) = self.0.get(&command_name) else {
-            return Err(ResponseError::Warn(format!(
-                "Command '{}' not found for user {user_id} in guild {guild_id}",
-                command_name
+            return Err(ResponseError::warn(format!(
+                "Command '{command_name}' not found for user {user_id} in guild {guild_id}"
             )));
         };
 
@@ -213,7 +212,7 @@ impl CommandExecution<Message> for CommandManager {
             Some(members) => members.fetch(&ctx.http, (guild_id, user_id)).await,
             None => None,
         }) else {
-            return Err(ResponseError::Err(format!(
+            return Err(ResponseError::new(format!(
                 "{command_prefix_print} Failed to extract Member {user_id} in guild {guild_id}",
             )));
         };
@@ -222,7 +221,7 @@ impl CommandExecution<Message> for CommandManager {
         let guild = match Pointer::<PartialGuild>::extract_context_event(ctx, &event).await {
             Some(guild_ptr) => guild_ptr.make_clone().await,
             None => {
-                return Err(ResponseError::Err(format!(
+                return Err(ResponseError::new(format!(
                     "{command_prefix_print} Failed to extract Guild {guild_id}"
                 )));
             }
@@ -230,7 +229,7 @@ impl CommandExecution<Message> for CommandManager {
 
         // ProcessManager for handling cooldowns and ephemerals
         let Some(p_manager) = Arc::<ProcessManager>::extract_context(ctx).await else {
-            return Err(ResponseError::Err(format!(
+            return Err(ResponseError::new(format!(
                 "{command_prefix_print} Failed to extract ProcessManager from context"
             )));
         };
@@ -253,14 +252,14 @@ impl CommandExecution<Message> for CommandManager {
                 .collect::<Vec<String>>()
                 .join(", ");
 
-            let response = ResponseError::Warn(format!(
+            let response = ResponseError::warn_silent(format!(
                 "{}: You're **missing** {text}{missing_perms_str}",
                 user_id.mention(),
             ));
             let response = create_error_embed(response);
 
             send_message(&ctx.http, &p_manager, &response, &msg);
-            return Err(ResponseError::Warn(format!(
+            return Err(ResponseError::warn(format!(
                 "{command_prefix_print} User {user_id} is missing permissions in guild {guild_id}: {missing_perms_str}"
             )));
         }
@@ -270,7 +269,7 @@ impl CommandExecution<Message> for CommandManager {
         {
             let cooldown = Cooldown::Command(guild_id, user_id, command_name.clone());
             if (cooldowns.0.read().await).get(&cooldown).is_some() {
-                return Err(ResponseError::Warn(format!(
+                return Err(ResponseError::warn(format!(
                     "{command_prefix_print} cooldown for user {user_id} in guild {guild_id}"
                 )));
             } else {
@@ -299,7 +298,7 @@ impl CommandExecution<CommandInteraction> for CommandManager {
         interaction: CommandInteraction,
     ) -> Result<Option<(CommandEvent, Pointer<Parser>)>, ResponseError> {
         let Some(guild_id) = interaction.guild_id else {
-            return Err(ResponseError::Err(format!(
+            return Err(ResponseError::new(format!(
                 "Command in DMs: User {}",
                 interaction.user.id
             )));
@@ -308,7 +307,7 @@ impl CommandExecution<CommandInteraction> for CommandManager {
         let command_name = interaction.data.name.to_lowercase();
 
         let Some(command) = self.0.get(&command_name) else {
-            return Err(ResponseError::Warn(format!(
+            return Err(ResponseError::warn(format!(
                 "Command '{}' not found for user {} in guild {guild_id}",
                 command_name, interaction.user.id
             )));
@@ -351,7 +350,7 @@ impl CommandExecution<CommandInteraction> for CommandManager {
             let response_msg: CreateInteractionResponse = match (&response).try_into() {
                 Ok(m) => m,
                 Err(e) => {
-                    return Err(ResponseError::Err(format!(
+                    return Err(ResponseError::new(format!(
                         "{command_name}: Failed to create interaction response message:\n{e}",
                     )));
                 }
@@ -431,11 +430,16 @@ pub(super) fn send_message(
 pub(super) fn create_error_embed(error: ResponseError) -> CommandResponse {
     let mut embed = CreateEmbed::default();
     embed = embed.description(error.to_string());
+    let is_ephemeral = error.is_silent();
     match error {
-        ResponseError::Err(_) => embed = embed.color(Colour::RED),
-        ResponseError::Warn(_) => embed = embed.color(Colour::GOLD),
+        ResponseError::Err(_, _) => embed = embed.color(Colour::RED),
+        ResponseError::Warn(_, _) => embed = embed.color(Colour::GOLD),
         ResponseError::Info(_) => embed = embed.color(Colour::BLITZ_BLUE),
     };
 
-    CommandResponse::new_embeds(vec![embed]).ephemeral()
+    let response = CommandResponse::new_embeds(vec![embed]);
+    if is_ephemeral {
+        return response.ephemeral();
+    }
+    response
 }

@@ -22,7 +22,7 @@ pub enum BackendHttpError {
 
 impl BackendHttpError {
     pub fn request(method: &str, endpoint: &str, error: Error) -> Self {
-        BackendHttpError::Request(format!("{method} ({endpoint}): {error:?}"))
+        BackendHttpError::Request(format!("{method} ({endpoint})\n{error:?}"))
     }
 
     pub fn status(method: &str, endpoint: &str, status: StatusCode, response: String) -> Self {
@@ -33,13 +33,13 @@ impl BackendHttpError {
 
     pub fn not_json(method: &str, endpoint: &str, error: Error) -> Self {
         BackendHttpError::NotJson(format!(
-            "{method} ({endpoint}): Response was not valid JSON: \n{error:?}"
+            "{method} ({endpoint}): Response was not valid JSON\n{error:?}"
         ))
     }
 
     pub fn parse(method: &str, endpoint: &str, error: serde_json::error::Error) -> Self {
         BackendHttpError::Parse(format!(
-            "{method} ({endpoint}): Failed to parse JSON: \n{error:?}"
+            "{method} ({endpoint}): Failed to parse JSON\n{error:?}"
         ))
     }
 

@@ -15,9 +15,7 @@ pub async fn handle(
     };
 
     let Some(command_manager) = CommandManager::extract_context(ctx).await else {
-        return Err(ResponseError::Err(
-            "CommandManager not found in TypeMap".into(),
-        ));
+        return Err(ResponseError::new("CommandManager not found in TypeMap"));
     };
 
     command_manager.execute(ctx, command.clone()).await

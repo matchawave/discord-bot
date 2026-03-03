@@ -41,7 +41,7 @@ impl ProcessLoop for AfkLoader {
                             count += 1;
                         }
                         Err(e) => {
-                            error!("AFKLoader: Error reading AFK status from stream: {e}");
+                            error!("AFKLoader: Error reading AFK status from stream\n{e}");
                             continue;
                         }
                     }
@@ -49,7 +49,7 @@ impl ProcessLoop for AfkLoader {
                 info!("AfkLoader: Finished loading AFK statuses, total count: {count}");
             }
             Err(e) => {
-                error!("AFKLoader: Failed to start AFK status stream: {e}");
+                error!("AFKLoader: Failed to start AFK status stream\n{e}");
             }
         }
     }

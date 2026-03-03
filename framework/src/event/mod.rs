@@ -108,8 +108,8 @@ async fn worker(
                 for func in commands.iter() {
                     if let Some(Err(result)) = func.call(&ctx, &command_event, &parser).await {
                         match result {
-                            ResponseError::Err(e) => error!("Command event: {e}"),
-                            ResponseError::Warn(e) => warning!("Command event: {e}"),
+                            ResponseError::Err(e, _) => error!("Command event: {e}"),
+                            ResponseError::Warn(e, _) => warning!("Command event: {e}"),
                             ResponseError::Info(e) => info!("Command event: {e}"),
                         }
                     }
@@ -118,12 +118,12 @@ async fn worker(
             }
             Ok(None) => {} // Not a command event, continue with normal processing
             Err(e) => match e {
-                ResponseError::Err(e) => {
+                ResponseError::Err(e, _) => {
                     error!("{e}");
                     continue;
                 }
 
-                ResponseError::Warn(e) => warning!("Warning handling command event: {e}"),
+                ResponseError::Warn(e, _) => warning!("Warning handling command event: {e}"),
                 _ => {}
             },
         }
@@ -146,8 +146,8 @@ async fn worker(
             for func in funcs.iter() {
                 if let Some(Err(result)) = func.call(&ctx, &event, &parser).await {
                     match result {
-                        ResponseError::Err(e) => error!("{event_name} event: {e}"),
-                        ResponseError::Warn(e) => warning!("{event_name} event: {e}"),
+                        ResponseError::Err(e, _) => error!("{event_name} event: {e}"),
+                        ResponseError::Warn(e, _) => warning!("{event_name} event: {e}"),
                         ResponseError::Info(e) => info!("{event_name} event: {e}"),
                     }
                 }

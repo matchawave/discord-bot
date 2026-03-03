@@ -165,30 +165,47 @@ impl ElapsedTime {
 pub type HttpType = Arc<serenity::http::Http>;
 pub type DataType = Arc<RwLock<serenity::prelude::TypeMap>>;
 
+/// bool indicates whether the error is silent or not
 pub enum ResponseError {
-    Err(String),
-    Warn(String),
+    Err(String, bool),
+    Warn(String, bool),
     Info(String),
 }
 impl ResponseError {
     pub fn new(msg: impl Into<String>) -> Self {
-        Self::Err(msg.into())
+        Self::Err(msg.into(), false)
+    }
+
+    pub fn new_silent(msg: impl Into<String>) -> Self {
+        Self::Err(msg.into(), true)
     }
 
     pub fn warn(msg: impl Into<String>) -> Self {
-        Self::Warn(msg.into())
+        Self::Warn(msg.into(), false)
+    }
+
+    pub fn warn_silent(msg: impl Into<String>) -> Self {
+        Self::Warn(msg.into(), true)
     }
 
     pub fn info(msg: impl Into<String>) -> Self {
         Self::Info(msg.into())
+    }
+
+    pub fn is_silent(&self) -> bool {
+        match self {
+            ResponseError::Err(_, silent) => *silent,
+            ResponseError::Warn(_, silent) => *silent,
+            ResponseError::Info(_) => false,
+        }
     }
 }
 
 impl std::fmt::Display for ResponseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ResponseError::Err(msg) => write!(f, "{}", msg),
-            ResponseError::Warn(msg) => write!(f, "{}", msg),
+            ResponseError::Err(msg, _) => write!(f, "{}", msg),
+            ResponseError::Warn(msg, _) => write!(f, "{}", msg),
             ResponseError::Info(msg) => write!(f, "{}", msg),
         }
     }
@@ -197,8 +214,8 @@ impl std::fmt::Display for ResponseError {
 impl Debug for ResponseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ResponseError::Err(msg) => write!(f, "Error: {}", msg),
-            ResponseError::Warn(msg) => write!(f, "Warning: {}", msg),
+            ResponseError::Err(msg, _) => write!(f, "Error: {}", msg),
+            ResponseError::Warn(msg, _) => write!(f, "Warning: {}", msg),
             ResponseError::Info(msg) => write!(f, "Info: {}", msg),
         }
     }
@@ -206,13 +223,13 @@ impl Debug for ResponseError {
 
 impl From<String> for ResponseError {
     fn from(value: String) -> Self {
-        Self::Err(value)
+        Self::Err(value, false)
     }
 }
 
 impl From<&str> for ResponseError {
     fn from(value: &str) -> Self {
-        Self::Err(value.into())
+        Self::Err(value.into(), false)
     }
 }
 
@@ -227,6 +244,20 @@ impl MemberData {
         Self {
             is_bot: member.user.bot,
             join_date: member.joined_at.unwrap_or_else(Timestamp::now), // Fallback to now if joined_at is None
+        }
+    }
+}
+
+pub fn suffix(num: u64) -> &'static str {
+    let last_two_digits = num % 100;
+    if (11..=13).contains(&last_two_digits) {
+        "th"
+    } else {
+        match num % 10 {
+            1 => "st",
+            2 => "nd",
+            3 => "rd",
+            _ => "th",
         }
     }
 }
