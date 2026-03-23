@@ -1,0 +1,65 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug matchawave",
+      "type": "lldb",
+      "request": "launch",
+      "cargo": {
+        "args": ["run", "--bin=matchawave", "--package=main"]
+      },
+      "args": []
+    },
+    {
+      "name": "Debug unit tests in executable 'matchawave'",
+      "type": "lldb",
+      "request": "launch",
+      "cargo": {
+        "args": ["test", "--bin=matchawave", "--package=main"]
+      }
+    },
+    {
+      "name": "Debug integration test 'afk'",
+      "type": "lldb",
+      "request": "launch",
+      "cargo": {
+        "args": ["test", "--test=afk", "--package=main"]
+      }
+    },
+    {
+      "name": "Debug integration test 'birthday'",
+      "type": "lldb",
+      "request": "launch",
+      "cargo": {
+        "args": ["test", "--test=birthday", "--package=main"]
+      }
+    },
+    {
+      "name": "Debug unit tests in library 'framework'",
+      "type": "lldb",
+      "request": "launch",
+      "cargo": {
+        "args": ["test", "--package=framework"]
+      }
+    },
+    {
+      "name": "Debug unit tests in library 'utils'",
+      "type": "lldb",
+      "request": "launch",
+      "cargo": {
+        "args": ["test", "--package=utils"]
+      }
+    },
+    {
+      "name": "Debug integration test 'parser'",
+      "type": "lldb",
+      "request": "launch",
+      "cargo": {
+        "args": ["test", "--test=parser", "--package=utils"]
+      }
+    }
+  ]
+}

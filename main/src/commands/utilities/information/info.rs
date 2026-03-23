@@ -25,7 +25,7 @@ pub fn command() -> ICommand {
         "The user to get the info of",
     );
     CommandBuilder::default()
-        .options(vec![options])
+        .options(&[options])
         .slash(interaction)
         .legacy(legacy)
         .build(NAME, DESCRIPTION)

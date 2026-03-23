@@ -1,5 +1,5 @@
 use framework::{
-    CacheExtractable, Extractable,
+    CacheExtractable,
     extractors::{ContextEventExtractor, ContextExtractor, EventExtractor, Extractor},
 };
 use moka::future::Cache;

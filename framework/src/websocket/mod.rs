@@ -53,7 +53,7 @@ where
         let req = configs::create_request(ws_url, token);
         WebSocketProcessor {
             req,
-            callbacks: self.0,
+            callbacks: Arc::new(self.0),
         }
     }
 }
@@ -63,7 +63,7 @@ where
     T: DeserializeOwned + Eq + std::hash::Hash,
 {
     req: ClientRequestBuilder,
-    callbacks: HashMap<T, Vec<EventCallback>>,
+    callbacks: Arc<HashMap<T, Vec<EventCallback>>>,
 }
 
 impl<T> WebSocketProcessor<T>
@@ -92,7 +92,7 @@ impl<T> TypeMapKey for WebSocketProcessor<T>
 where
     T: DeserializeOwned + Eq + std::hash::Hash + Send + Sync + 'static,
 {
-    type Value = Arc<WebSocketProcessor<T>>;
+    type Value = WebSocketProcessor<T>;
 }
 
 #[async_trait]
@@ -134,6 +134,18 @@ where
                     tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
                 }
             }
+        }
+    }
+}
+
+impl<T> Clone for WebSocketProcessor<T>
+where
+    T: DeserializeOwned + Eq + std::hash::Hash,
+{
+    fn clone(&self) -> Self {
+        Self {
+            req: self.req.clone(),
+            callbacks: self.callbacks.clone(),
         }
     }
 }

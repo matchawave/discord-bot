@@ -15,11 +15,35 @@ type DefaultStorage = dyn ProcessLoop + Send + Sync;
 #[macro_export]
 macro_rules! build_process {
     ($name:ident, $ty:ty) => {
-        #[derive(Default)]
-        pub struct $name(pub tokio::sync::RwLock<$ty>);
+        #[derive(Default, Clone)]
+        pub struct $name(pub utils::Pointer<$ty>);
 
         impl serenity::prelude::TypeMapKey for $name {
-            type Value = std::sync::Arc<$name>;
+            type Value = $name;
+        }
+
+        #[serenity::async_trait]
+        impl $crate::extractors::ContextExtractor for $name {
+            async fn extract_context(ctx: &serenity::all::Context) -> Option<Self> {
+                let manager =
+                    std::sync::Arc::<$crate::processes::ProcessManager>::extract_context(ctx)
+                        .await?;
+                manager.get::<Self>().clone()
+            }
+        }
+
+        #[serenity::async_trait]
+        impl<T> $crate::extractors::Extractor<T> for $name
+        where
+            T: Send + Sync + 'static,
+        {
+            async fn extract(
+                ctx: &serenity::all::Context,
+                _: &T,
+                _: &utils::Pointer<utils::Parser>,
+            ) -> Option<Self> {
+                Self::extract_context(ctx).await
+            }
         }
     };
 }
@@ -45,18 +69,17 @@ impl ProcessManager {
 
     pub fn register_process<P>(&mut self, process: P)
     where
-        P: ProcessLoop + 'static,
-        P: TypeMapKey<Value = Arc<P>>,
+        P: Clone + ProcessLoop + 'static,
+        P: TypeMapKey<Value = P>,
     {
-        let process_ptr = Arc::new(process);
-        self.process_vec.push(process_ptr.clone());
-        self.process_map.insert::<P>(process_ptr);
+        self.process_vec.push(Arc::new(process.clone()));
+        self.process_map.insert::<P>(process);
     }
 
-    pub fn get<P>(&self) -> Option<Arc<P>>
+    pub fn get<P>(&self) -> Option<P>
     where
-        P: ProcessLoop + Send + Sync + 'static,
-        P: TypeMapKey<Value = Arc<P>>,
+        P: Clone + ProcessLoop + Send + Sync + 'static,
+        P: TypeMapKey<Value = P>,
     {
         self.process_map.get::<P>().cloned()
     }

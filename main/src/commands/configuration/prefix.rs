@@ -34,8 +34,8 @@ pub fn command() -> ICommand {
         "Get the current server prefix",
     );
     CommandBuilder::default()
-        .options(vec![set_options, remove_options, get_options])
-        .permissions(vec![BotPermission::BotMaster])
+        .options(&[set_options, remove_options, get_options])
+        .permissions(&[BotPermission::BotMaster])
         .slash(interaction)
         .legacy(legacy)
         .build(NAME, DESCRIPTION)

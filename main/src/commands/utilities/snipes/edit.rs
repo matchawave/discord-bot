@@ -25,8 +25,8 @@ pub fn command() -> ICommand {
     .max_int_value(10)
     .min_int_value(1);
     CommandBuilder::default()
-        .options(vec![index_option])
-        .permissions(vec![BotPermission::ManageMessages])
+        .options(&[index_option])
+        .permissions(&[BotPermission::ManageMessages])
         .slash(interaction)
         .legacy(legacy)
         .build(NAME, DESCRIPTION)

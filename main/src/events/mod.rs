@@ -3,7 +3,7 @@ mod guild;
 mod member;
 mod message;
 mod ready;
-mod voice_states;
+mod voice;
 
 use framework::event::{EventManager, EventManagerBuilder};
 use utils::DiscordEvent;
@@ -26,9 +26,9 @@ pub fn create_event_handler(shard_count: usize) -> EventManager {
         .add_event(DiscordEvent::ChannelUpdate, channel::update)
         .add_event(DiscordEvent::ChannelDelete, channel::delete)
         // Voice State Events
-        .add_event(DiscordEvent::VoiceStateUpdate, voice_states::channels)
-        .add_event(DiscordEvent::VoiceStateUpdate, voice_states::create)
-        .add_event(DiscordEvent::VoiceStateUpdate, voice_states::delete)
+        .add_event(DiscordEvent::VoiceStateUpdate, voice::channels)
+        .add_event(DiscordEvent::VoiceStateUpdate, voice::voice_master::create)
+        .add_event(DiscordEvent::VoiceStateUpdate, voice::voice_master::delete)
         // Member Events
         .add_event(DiscordEvent::GuildMemberAdd, member::add_member)
         .add_event(DiscordEvent::GuildMemberRemove, member::subtract_member)

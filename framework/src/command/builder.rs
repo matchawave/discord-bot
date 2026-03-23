@@ -156,8 +156,8 @@ pub struct CommandBuilder {
 }
 
 impl CommandBuilder {
-    pub fn permissions(mut self, permissions: Vec<BotPermission>) -> Self {
-        self.permissions = permissions;
+    pub fn permissions(mut self, permissions: &[BotPermission]) -> Self {
+        self.permissions = permissions.to_vec();
         self
     }
 
@@ -166,8 +166,8 @@ impl CommandBuilder {
         self
     }
 
-    pub fn options(mut self, options: Vec<CreateCommandOption>) -> Self {
-        self.options = options;
+    pub fn options(mut self, options: &[CreateCommandOption]) -> Self {
+        self.options = options.to_vec();
         self
     }
 

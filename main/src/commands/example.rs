@@ -10,8 +10,8 @@ const DESCRIPTION: &str = "An example command";
 pub fn command() -> ICommand {
     let options = CreateCommandOption::new(CommandOptionType::String, "", "");
     CommandBuilder::default()
-        .options(vec![options])
-        .permissions(vec![BotPermission::ManageGuild])
+        .options(&[options])
+        .permissions(&[BotPermission::ManageGuild])
         .slash(interaction)
         .legacy(legacy)
         .build(NAME, DESCRIPTION)

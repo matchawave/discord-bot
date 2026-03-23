@@ -37,9 +37,14 @@ impl BackendHttpError {
         ))
     }
 
-    pub fn parse(method: &str, endpoint: &str, error: serde_json::error::Error) -> Self {
+    pub fn parse(
+        method: &str,
+        endpoint: &str,
+        data: &String,
+        error: serde_json::error::Error,
+    ) -> Self {
         BackendHttpError::Parse(format!(
-            "{method} ({endpoint}): Failed to parse JSON\n{error:?}"
+            "{method} ({endpoint}): Failed to parse JSON\n{data}\n{error:?}"
         ))
     }
 
@@ -107,7 +112,7 @@ impl BackendHttp {
         }
 
         let parsed = serde_json::from_str::<U>(&body)
-            .map_err(|e| BackendHttpError::parse("GET", endpoint, e))?;
+            .map_err(|e| BackendHttpError::parse("GET", endpoint, &trimmed_body, e))?;
 
         Ok(Some(parsed))
     }
@@ -136,7 +141,7 @@ impl BackendHttp {
                 }
 
                 let parsed = serde_json::from_str::<U>(&body)
-                    .map_err(|e| BackendHttpError::parse("POST", endpoint, e))?;
+                    .map_err(|e| BackendHttpError::parse("POST", endpoint, &trimmed_body, e))?;
 
                 Ok(Some(parsed))
             }
@@ -171,7 +176,7 @@ impl BackendHttp {
                 }
 
                 let parsed = serde_json::from_str::<U>(&body)
-                    .map_err(|e| BackendHttpError::parse("DELETE", endpoint, e))?;
+                    .map_err(|e| BackendHttpError::parse("DELETE", endpoint, &trimmed_body, e))?;
 
                 Ok(Some(parsed))
             }
@@ -229,7 +234,7 @@ impl BackendHttp {
                         Ok(item) => yield Ok(item),
                         Err(e) => {
                             error!("Failed to parse line from {}: {}\nLine content: {}", link, e, line);
-                            yield Err(BackendHttpError::parse("Stream", &endpoint, e));
+                            yield Err(BackendHttpError::parse("Stream", &endpoint, &line, e));
                         }
                     }
                 }
@@ -239,7 +244,7 @@ impl BackendHttp {
                     Ok(item) => yield Ok(item),
                     Err(e) => {
                         error!("Failed to parse final buffer from {}: {}", link, e);
-                        yield Err(BackendHttpError::parse("Stream", &endpoint, e));
+                        yield Err(BackendHttpError::parse("Stream", &endpoint, &buffer.trim().to_string(), e));
                     }
                 }
             }

@@ -131,58 +131,40 @@ where
 }
 
 #[derive(Debug)]
-pub struct GlobalMap<V>(Pointer<HashMap<UserGlobalType, Pointer<V>>>)
+pub struct GlobalMap<V>(HashMap<UserGlobalType, Pointer<V>>)
 where
     V: Send + Sync + 'static;
-
-impl<V> TypeMapKey for GlobalMap<V>
-where
-    V: Send + Sync + 'static,
-{
-    type Value = GlobalMap<V>;
-}
-
-impl<V> Clone for GlobalMap<V>
-where
-    V: Send + Sync + 'static,
-{
-    fn clone(&self) -> Self {
-        Self(self.0.clone())
-    }
-}
 
 impl<V> GlobalMap<V>
 where
     V: Send + Sync + 'static,
 {
-    pub async fn get(&self, guild_id: Option<GuildId>, user_id: UserId) -> Option<Pointer<V>> {
-        let map = self.0.read().await;
+    pub fn get(&self, guild_id: Option<GuildId>, user_id: UserId) -> Option<Pointer<V>> {
         if let Some(guild_id) = guild_id {
-            return map
+            return self
+                .0
                 .get(&UserGlobalType::Guild(guild_id, user_id))
-                .or_else(|| map.get(&UserGlobalType::User(user_id)))
+                .or_else(|| self.0.get(&UserGlobalType::User(user_id)))
                 .cloned();
         }
-        map.get(&UserGlobalType::User(user_id)).cloned()
+        self.0.get(&UserGlobalType::User(user_id)).cloned()
     }
 
-    pub async fn insert(&self, guild_id: Option<GuildId>, user_id: UserId, value: V) -> Pointer<V> {
-        let mut map = self.0.write().await;
+    pub fn insert(&mut self, guild_id: Option<GuildId>, user_id: UserId, value: V) -> Pointer<V> {
         let key = guild_id
             .map(|g_id| UserGlobalType::Guild(g_id, user_id))
             .unwrap_or(UserGlobalType::User(user_id));
         let ptr = Pointer::new(value);
-        map.insert(key, ptr.clone());
+        self.0.insert(key, ptr.clone());
         ptr
     }
 
-    pub async fn remove(&self, guild_id: Option<GuildId>, user_id: UserId) -> Option<V> {
-        let mut map = self.0.write().await;
+    pub fn remove(&mut self, guild_id: Option<GuildId>, user_id: UserId) -> Option<V> {
         let ptr = match guild_id {
-            Some(guild_id) => map
+            Some(guild_id) => (self.0)
                 .remove(&UserGlobalType::Guild(guild_id, user_id))
-                .or_else(|| map.remove(&UserGlobalType::User(user_id))),
-            None => map.remove(&UserGlobalType::User(user_id)),
+                .or_else(|| self.0.remove(&UserGlobalType::User(user_id))),
+            None => self.0.remove(&UserGlobalType::User(user_id)),
         }?;
 
         match ptr.inner() {
@@ -194,51 +176,49 @@ where
         }
     }
 
-    pub async fn contains_user(&self, user_id: UserId) -> bool {
-        let map = self.0.read().await;
-        map.keys().any(|key| match key {
+    pub fn contains_user(&self, user_id: UserId) -> bool {
+        self.0.keys().any(|key| match key {
             UserGlobalType::Guild(_, uid) | UserGlobalType::User(uid) => *uid == user_id,
         })
     }
 
-    pub async fn clear_user(&self, user_id: UserId) {
-        let mut map = self.0.write().await;
-        map.retain(|key, _| match key {
+    pub fn clear_user(&mut self, user_id: UserId) {
+        self.0.retain(|key, _| match key {
             UserGlobalType::Guild(_, uid) | UserGlobalType::User(uid) => *uid != user_id,
         });
     }
 }
 
-#[async_trait]
-impl<T, V> Extractor<T> for GlobalMap<V>
-where
-    V: Send + Sync + 'static,
-{
-    async fn extract(
-        ctx: &serenity::all::Context,
-        _: &T,
-        _: &utils::Pointer<utils::Parser>,
-    ) -> Option<Self> {
-        GlobalMap::<V>::extract_context(ctx).await
-    }
-}
+// #[async_trait]
+// impl<T, V> Extractor<T> for GlobalMap<V>
+// where
+//     V: Send + Sync + 'static,
+// {
+//     async fn extract(
+//         ctx: &serenity::all::Context,
+//         _: &T,
+//         _: &utils::Pointer<utils::Parser>,
+//     ) -> Option<Self> {
+//         GlobalMap::<V>::extract_context(ctx).await
+//     }
+// }
 
-#[async_trait]
-impl<V> ContextExtractor for GlobalMap<V>
-where
-    V: Send + Sync + 'static,
-{
-    async fn extract_context(ctx: &serenity::all::Context) -> Option<Self> {
-        let data = ctx.data.read().await;
-        data.get::<GlobalMap<V>>().cloned()
-    }
-}
+// #[async_trait]
+// impl<V> ContextExtractor for GlobalMap<V>
+// where
+//     V: Send + Sync + 'static,
+// {
+//     async fn extract_context(ctx: &serenity::all::Context) -> Option<Self> {
+//         let data = ctx.data.read().await;
+//         data.get::<GlobalMap<V>>().cloned()
+//     }
+// }
 
 impl<T> Default for GlobalMap<T>
 where
     T: Send + Sync + 'static,
 {
     fn default() -> Self {
-        Self(Pointer::new(HashMap::new()))
+        Self(HashMap::new())
     }
 }

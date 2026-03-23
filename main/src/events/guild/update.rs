@@ -1,17 +1,12 @@
 use std::fmt::Display;
 
-use framework::guilds::{GuildMap, Guilds};
+use framework::guilds::Guilds;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serenity::all::{
-    AfkMetadata, ChannelId, ImageHash, NsfwLevel, PartialGuild, PremiumTier, ShardId,
-    UnavailableGuild, UserId, VerificationLevel,
+    AfkMetadata, ChannelId, ImageHash, NsfwLevel, PartialGuild, PremiumTier, UserId,
+    VerificationLevel,
 };
 use utils::info;
-
-use crate::{
-    cache::snipe::{EditSnipes, ReactionSnipes, Snipes},
-    global::backend_http::{self, BackendHttp},
-};
 
 pub async fn update(guild: PartialGuild, guilds: Guilds) {
     if let Some(old_guild_ptr) = guilds.get_ptr::<PartialGuild>(guild.id).await {

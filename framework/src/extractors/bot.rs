@@ -1,44 +1,27 @@
 use serenity::{
     all::{Context, User},
     async_trait,
-    prelude::TypeMapKey,
 };
 
-use utils::{DataType, Parser, Pointer};
+use utils::{Parser, Pointer};
 
-use crate::extractors::{ContextExtractor, Extractor};
+use crate::{
+    ShardData,
+    extractors::{ContextExtractor, Extractor},
+};
 
-struct Bot;
-impl TypeMapKey for Bot {
-    type Value = User;
-}
-
-pub struct CurrentBot(pub User);
-
-impl CurrentBot {
-    pub async fn set(data: &DataType, bot: User) {
-        let mut data = data.write().await;
-        data.insert::<Bot>(bot);
-    }
-    pub async fn get(data: &DataType) -> Option<User> {
-        let data = data.read().await;
-        data.get::<Bot>().cloned()
-    }
-    pub async fn is_set(data: &DataType) -> bool {
-        let data = data.read().await;
-        data.contains_key::<Bot>()
-    }
-}
+pub struct Bot(pub User);
 
 #[async_trait]
-impl ContextExtractor for CurrentBot {
+impl ContextExtractor for Bot {
     async fn extract_context(ctx: &Context) -> Option<Self> {
-        CurrentBot::get(&ctx.data).await.map(CurrentBot)
+        let bot = ShardData::get(ctx.shard_id, &ctx.data).await?.bot;
+        bot.read().await.clone().map(Bot)
     }
 }
 
 #[async_trait]
-impl<T> Extractor<T> for CurrentBot
+impl<T> Extractor<T> for Bot
 where
     T: Send + Sync,
 {

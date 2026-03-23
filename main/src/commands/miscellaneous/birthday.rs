@@ -35,7 +35,7 @@ pub fn command() -> ICommand {
             .add_sub_option(date_option);
 
     CommandBuilder::default()
-        .options(vec![set_options])
+        .options(&[set_options])
         .slash(interaction)
         .legacy(legacy)
         .build(NAME, DESCRIPTION)
@@ -114,6 +114,14 @@ async fn legacy(
     cache: GlobalCache<Birthday>,
     backend_http: BackendHttp,
 ) -> CommandResult<CreateEmbed> {
+    if let Some(first_option) = options.first()
+        && first_option.eq_ignore_ascii_case("list")
+    {
+        // This is to handle guild's birthday listing
+        return Ok(Some(
+            CreateEmbed::default().description("To view a list of birthdays in this guild"),
+        ));
+    }
     let target_id = match options.first() {
         Some(s) => *(MemberOption::from_str(s)?),
         None => user_id,

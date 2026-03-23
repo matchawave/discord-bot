@@ -1,14 +1,14 @@
 use std::{collections::HashMap, sync::Arc};
 
 use serenity::{
-    all::{ChannelId, Context, GuildId, UserId},
+    all::{ChannelId, GuildId, UserId},
     async_trait,
 };
-use utils::{DiscordEvent, HttpType, Pointer, info};
+use utils::{DiscordEvent, HttpType, info};
 
 use crate::{
     build_process,
-    extractors::{ContextExtractor, Extractor},
+    extractors::ContextExtractor,
     processes::{ProcessLoop, ProcessManager},
 };
 use std::{fmt::Debug, hash::Hash};
@@ -45,24 +45,6 @@ impl Cooldown {
             Cooldown::Event(_, _, identifier) => format!("{identifier:?}"),
             Cooldown::VoiceMaster(_, channel_id, _) => channel_id.to_string(),
         }
-    }
-}
-
-#[async_trait]
-impl ContextExtractor for Arc<Cooldowns> {
-    async fn extract_context(ctx: &Context) -> Option<Self> {
-        let p_manager = Arc::<ProcessManager>::extract_context(ctx).await?;
-        p_manager.get::<Cooldowns>()
-    }
-}
-
-#[async_trait]
-impl<T> Extractor<T> for Arc<Cooldowns>
-where
-    T: Send + Sync + 'static,
-{
-    async fn extract(ctx: &Context, _: &T, _: &Pointer<utils::Parser>) -> Option<Self> {
-        Arc::<Cooldowns>::extract_context(ctx).await
     }
 }
 

@@ -1,7 +1,7 @@
 use framework::{
     command::{CommandBuilder, CommandResult, ICommand},
     extractors::InteractionOptions,
-    global::{GlobalCache, GlobalMap},
+    global::GlobalCache,
 };
 use serde::{Deserialize, Serialize};
 use serenity::all::{
@@ -12,7 +12,8 @@ use utils::{Pointer, ResponseError, error, info};
 
 use crate::{
     configs::AfkConfig,
-    global::{afk::AfkStatus, backend_http::BackendHttp},
+    global::backend_http::BackendHttp,
+    processes::{AfkInstance, AfkStatus},
     success,
 };
 
@@ -42,8 +43,8 @@ pub fn command() -> ICommand {
     .add_sub_option(default_reason_option);
 
     CommandBuilder::default()
-        .options(vec![config_subcommand])
-        .permissions(vec![])
+        .options(&[config_subcommand])
+        .permissions(&[])
         .slash(interaction)
         .legacy(legacy)
         .build(NAME, DESCRIPTION)
@@ -90,7 +91,7 @@ struct AfkConfigResponse {
 async fn interaction(
     user_id: UserId,
     options: InteractionOptions,
-    map: GlobalMap<AfkStatus>,
+    map: AfkInstance,
     cache: GlobalCache<AfkConfig>,
     backend_http: BackendHttp,
 ) -> CommandResult<CreateEmbed> {
@@ -152,14 +153,15 @@ async fn clear_user_afk_statuses(
     user_id: UserId,
     old_config: Option<AfkConfig>,
     new_config: AfkConfig,
-    map: GlobalMap<AfkStatus>,
+    AfkInstance(map): AfkInstance,
     backend_http: BackendHttp,
 ) {
+    let contains_user = map.read().await.contains_user(user_id);
     if let Some(old_config) = old_config
         && old_config.per_guild != new_config.per_guild
-        && map.contains_user(user_id).await
+        && contains_user
     {
-        map.clear_user(user_id).await;
+        map.write().await.clear_user(user_id);
         let path = format!("api/afk/user/{}", user_id);
         if let Err(e) = backend_http.delete::<()>(&path).await {
             error!("Error clearing AFK statuses for user {user_id} after per_guild change: {e}");
@@ -180,14 +182,14 @@ async fn legacy(
     guild_id: GuildId,
     options: Vec<String>,
     member: Member,
-    map: GlobalMap<AfkStatus>,
+    map: AfkInstance,
     backend_http: BackendHttp,
     cache: GlobalCache<AfkConfig>,
 ) -> CommandResult<CreateEmbed> {
     let user_id = member.user.id;
 
     // Check if user is already AFK in this guild or globally
-    if map.contains_user(user_id).await {
+    if map.0.read().await.contains_user(user_id) {
         return Err(ResponseError::warn(format!(
             "{}: You are already AFK",
             user_id.mention()
@@ -234,7 +236,7 @@ async fn legacy(
     };
 
     let reason = afk_status.reason.clone();
-    map.insert(guild_id, user_id, afk_status).await;
+    (map.0.write().await).insert(guild_id, user_id, afk_status);
 
     Ok(Some(success!(
         user_id,

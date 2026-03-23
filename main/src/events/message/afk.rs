@@ -8,7 +8,6 @@ use framework::{
     command::CommandName,
     data::{Ephemeral, Ephemerals},
     event::EventResult,
-    global::GlobalMap,
     guilds::{HTTPGetter, Messages},
 };
 use serenity::all::{
@@ -17,7 +16,7 @@ use serenity::all::{
 };
 use utils::{HttpType, error};
 
-use crate::global::{afk::AfkStatus, backend_http::BackendHttp};
+use crate::{global::backend_http::BackendHttp, processes::AfkInstance};
 
 const AFK_MAX_MENTIONED_USERS: usize = 10; // ! Discord only allows up to 10 embeds per message 
 
@@ -27,8 +26,8 @@ pub async fn check(
     channel_id: ChannelId,
     message: Message,
     user_id: UserId,
-    map: GlobalMap<AfkStatus>,
-    ephemerals: Arc<Ephemerals>,
+    afk_instance: AfkInstance,
+    ephemerals: Ephemerals,
     http: HttpType,
     backend_http: BackendHttp,
 ) -> EventResult {
@@ -37,7 +36,7 @@ pub async fn check(
         channel_id,
         Some(message),
         user_id,
-        map,
+        afk_instance,
         ephemerals,
         http,
         backend_http,
@@ -50,8 +49,8 @@ pub async fn cmd_check(
     guild_id: GuildId,
     channel_id: ChannelId,
     user_id: UserId,
-    map: GlobalMap<AfkStatus>,
-    ephemerals: Arc<Ephemerals>,
+    afk_instance: AfkInstance,
+    ephemerals: Ephemerals,
     http: HttpType,
     backend_http: BackendHttp,
 ) -> EventResult {
@@ -63,7 +62,7 @@ pub async fn cmd_check(
         channel_id,
         None, // No message reference for command checks
         user_id,
-        map,
+        afk_instance,
         ephemerals,
         http,
         backend_http,
@@ -77,12 +76,12 @@ async fn check_function(
     channel_id: ChannelId,
     message: Option<Message>,
     user_id: UserId,
-    map: GlobalMap<AfkStatus>,
-    ephemerals: Arc<Ephemerals>,
+    AfkInstance(map): AfkInstance,
+    Ephemerals(ephemerals): Ephemerals,
     http: HttpType,
     backend_http: BackendHttp,
 ) -> EventResult {
-    if let Some(afk_status) = map.remove(Some(guild_id), user_id).await {
+    if let Some(afk_status) = map.write().await.remove(Some(guild_id), user_id) {
         let duration_str = calculate_duration(afk_status.created_at);
 
         let content = format!(
@@ -113,7 +112,7 @@ async fn check_function(
             };
 
             let k = Ephemeral::new(&sent_msg);
-            (ephemerals.0.write().await).insert(k, Instant::now() + Duration::from_secs(5));
+            (ephemerals.write().await).insert(k, Instant::now() + Duration::from_secs(5));
 
             let mut path = format!("api/afk/user/{}", user_id);
             if let Some(g_id) = afk_status.guild_id {
@@ -162,7 +161,7 @@ fn calculate_duration(created_at: DateTime<chrono::Utc>) -> String {
 pub async fn check_mentions(
     guild: PartialGuild,
     message: Message,
-    map: GlobalMap<AfkStatus>,
+    AfkInstance(map): AfkInstance,
     http: HttpType,
     messages: Messages,
 ) -> EventResult {
@@ -187,7 +186,7 @@ pub async fn check_mentions(
 
     let mut output_embeds = Vec::with_capacity(mentioned_ids.len());
     for user_id in mentioned_ids {
-        if let Some(afk_status) = map.get(Some(guild.id), user_id).await {
+        if let Some(afk_status) = map.read().await.get(Some(guild.id), user_id) {
             let afk_status = afk_status.read().await; // Clone the AFK status to avoid holding the lock
 
             let formatted = FormattedTimestamp::new(

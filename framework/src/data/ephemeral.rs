@@ -1,14 +1,14 @@
 use std::{collections::HashMap, sync::Arc};
 
 use serenity::{
-    all::{ChannelId, Context, Message, MessageId},
+    all::{ChannelId, Message, MessageId},
     async_trait,
 };
-use utils::{HttpType, Pointer, error, info};
+use utils::{HttpType, error, info};
 
 use crate::{
     build_process,
-    extractors::{ContextExtractor, Extractor},
+    extractors::ContextExtractor,
     processes::{ProcessLoop, ProcessManager},
 };
 
@@ -63,23 +63,5 @@ impl ProcessLoop for Ephemerals {
             }
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
         }
-    }
-}
-
-#[async_trait]
-impl ContextExtractor for Arc<Ephemerals> {
-    async fn extract_context(ctx: &Context) -> Option<Self> {
-        let p_manager = Arc::<ProcessManager>::extract_context(ctx).await?;
-        p_manager.get::<Ephemerals>()
-    }
-}
-
-#[async_trait]
-impl<T> Extractor<T> for Arc<Ephemerals>
-where
-    T: Send + Sync + 'static,
-{
-    async fn extract(ctx: &Context, _: &T, _: &Pointer<utils::Parser>) -> Option<Self> {
-        Arc::<Ephemerals>::extract_context(ctx).await
     }
 }

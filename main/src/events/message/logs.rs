@@ -15,7 +15,7 @@ use serenity::all::{
 };
 use utils::{HttpType, debug, error};
 
-use crate::{events::message, global::afk::AfkStatus};
+use crate::events::message;
 
 macro_rules! log_message_event {
     ($action:expr, $guild:expr, $message_id:expr) => {

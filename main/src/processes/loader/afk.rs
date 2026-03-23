@@ -1,34 +1,39 @@
-use std::sync::Arc;
-
-use framework::{global::GlobalMap, processes::ProcessLoop};
+use framework::{
+    build_process, extractors::ContextExtractor, global::GlobalMap, processes::ProcessLoop,
+};
 use futures_util::StreamExt;
-use serenity::{async_trait, prelude::TypeMapKey};
 use utils::{error, info};
 
-use crate::global::{afk::AfkStatus, backend_http::BackendHttp};
+use crate::global::backend_http::BackendHttp;
 
-#[derive(Debug, Clone)]
-pub struct AfkLoader;
+use chrono::DateTime;
+use serde::Deserialize;
+use serenity::all::{GuildId, UserId};
+use utils::{deserialize_date, deserialize_id, deserialize_optional_id};
 
-impl TypeMapKey for AfkLoader {
-    type Value = Arc<AfkLoader>;
+#[derive(Deserialize, Clone, Debug)]
+pub struct AfkStatus {
+    #[serde(deserialize_with = "deserialize_id")]
+    pub user_id: UserId,
+    #[serde(deserialize_with = "deserialize_optional_id")]
+    pub guild_id: Option<GuildId>,
+    #[serde(deserialize_with = "deserialize_date")]
+    pub created_at: DateTime<chrono::Utc>,
+    pub reason: String,
 }
 
-#[async_trait]
-impl ProcessLoop for AfkLoader {
+build_process!(AfkInstance, GlobalMap<AfkStatus>);
+
+#[serenity::async_trait]
+impl ProcessLoop for AfkInstance {
     async fn process(&self, _: utils::HttpType, data: utils::DataType) {
-        let (backend_http, afk_statuses) = {
+        let backend_http = {
             let data = data.read().await;
             let Some(backend_http) = data.get::<BackendHttp>().cloned() else {
-                error!("AFKLoader: BackendHttp not found in data");
+                error!("AFKInstance: BackendHttp not found in data");
                 return;
             };
-
-            let Some(afk_statuses) = data.get::<GlobalMap<AfkStatus>>().cloned() else {
-                error!("AFKLoader: GlobalMap<AfkStatus> not found in data");
-                return;
-            };
-            (backend_http, afk_statuses)
+            backend_http
         };
 
         match backend_http.stream::<AfkStatus>("api/afk").await {
@@ -37,19 +42,20 @@ impl ProcessLoop for AfkLoader {
                 while let Some(afk_status) = stream.next().await {
                     match afk_status {
                         Ok(status) => {
-                            (afk_statuses.insert(status.guild_id, status.user_id, status)).await;
+                            let mut afk_statuses = self.0.write().await;
+                            (afk_statuses.insert(status.guild_id, status.user_id, status));
                             count += 1;
                         }
                         Err(e) => {
-                            error!("AFKLoader: Error reading AFK status from stream\n{e}");
+                            error!("AFKInstance: Error reading AFK status from stream\n{e}");
                             continue;
                         }
                     }
                 }
-                info!("AfkLoader: Finished loading AFK statuses, total count: {count}");
+                info!("AfkInstance: Finished loading AFK statuses, total count: {count}");
             }
             Err(e) => {
-                error!("AFKLoader: Failed to start AFK status stream\n{e}");
+                error!("AFKInstance: Failed to start AFK status stream\n{e}");
             }
         }
     }

@@ -1,4 +1,4 @@
-use chrono::DateTime;
+use chrono::{DateTime, NaiveDateTime};
 use serde::Deserialize;
 
 pub fn deserialize_id<'de, D, T>(deserializer: D) -> Result<T, D::Error>
@@ -30,14 +30,11 @@ where
     D: serde::Deserializer<'de>,
 {
     let s = String::deserialize(deserializer)?; // String is in UTC RFC3339 format
-    let date: DateTime<chrono::Utc> = match DateTime::parse_from_rfc3339(&s) {
-        Ok(dt) => dt.into(),
-        Err(_) => {
-            return Err(serde::de::Error::invalid_value(
-                serde::de::Unexpected::Str(&s),
-                &"a valid RFC3339 datetime string",
-            ));
-        }
-    };
-    Ok(date)
+    let naive = NaiveDateTime::parse_from_str(&s, "%Y-%m-%d %H:%M:%S").map_err(|_| {
+        serde::de::Error::invalid_value(
+            serde::de::Unexpected::Str(&s),
+            &"a valid datetime string in the format YYYY-MM-DD HH:MM:SS",
+        )
+    })?;
+    Ok(naive.and_utc())
 }
