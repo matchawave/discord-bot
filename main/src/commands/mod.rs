@@ -4,6 +4,8 @@ use framework::{
 };
 use serenity::all::{Colour, CreateEmbed, CreateEmbedAuthor, Member, User, UserId};
 use utils::HttpType;
+
+use crate::permissions;
 mod configuration;
 mod example;
 mod miscellaneous;
@@ -14,6 +16,7 @@ pub fn create_command_handler() -> CommandManager {
         .add_commands(utilities::module())
         .add_commands(configuration::module())
         .add_commands(miscellaneous::module())
+        .set_permission_callback(permissions::callback)
         .build()
 }
 

@@ -16,12 +16,13 @@ mod configs;
 mod data;
 mod events;
 mod global;
+mod permissions;
 mod processes;
 mod websocket;
 
 #[tokio::main]
 async fn main() {
-    let shards = 1;
+    let shards = 1; // You can adjust this based on your needs and Discord's recommendations
     let token = env!("TOKEN");
     let api_url = env!("BACKEND_URL");
     let bot_id = get_bot_id();
@@ -30,8 +31,12 @@ async fn main() {
     let http = Http::new(token);
     let mut data = TypeMap::new();
 
+    // Should just create a whole instance builder
+
     let event_handler = events::create_event_handler(shards); // Create the event handler for the bot
     let command_manager = commands::create_command_handler(); // Command manager for registering and handling commands
+    // Need a permission handler
+
     let backend_http = BackendHttp::new(token, api_url); // This is for communicating with the backend serverlet backend_http = BackendHttp::new(token, api_url); // This is for communicating with the backend server
     set_shards(&backend_http, shards as u32).await; // Set the number of shards in the backend
     let websocket = websocket::get_websocket_connection().build(api_url, bot_id, token); // WebSocket connection to the backend
@@ -39,6 +44,7 @@ async fn main() {
 
     set_global(backend_http, &mut data);
     ShardData::init(shards, &mut data);
+    data.insert(value);
     command_manager.set(&mut data);
 
     let client_builder = ClientBuilder::new_with_http(http, bot_intent)

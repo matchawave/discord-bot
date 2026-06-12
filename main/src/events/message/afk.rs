@@ -118,7 +118,7 @@ async fn check_function(
             if let Some(g_id) = afk_status.guild_id {
                 path.push_str(&format!("?guild_id={g_id}"));
             }
-            if let Err(e) = backend_http.delete::<()>(&path).await {
+            if let Err(e) = backend_http.delete::<(), ()>(&path, &()).await {
                 error!("Failed to delete AFK status for user {}: {}", user_id, e);
             }
         });

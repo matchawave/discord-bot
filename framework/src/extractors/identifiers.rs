@@ -5,7 +5,7 @@ use serenity::{
 use utils::{Parser, Pointer};
 
 use crate::{
-    command::{CommandAction, CommandEvent},
+    command::{CommandAction, CommandEvent, PermissionCheck, PermissionRequest},
     extractors::{ContextExtractor, EventExtractor, Extractor},
 };
 
@@ -93,6 +93,13 @@ impl EventExtractor<CommandEvent> for GuildId {
 }
 
 #[async_trait]
+impl EventExtractor<PermissionRequest> for GuildId {
+    async fn extract_event(perm_req: &PermissionRequest) -> Option<Self> {
+        perm_req.guild_id.into()
+    }
+}
+
+#[async_trait]
 impl EventExtractor<Event> for ChannelId {
     async fn extract_event(ev: &Event) -> Option<Self> {
         match ev {
@@ -128,6 +135,13 @@ impl EventExtractor<CommandEvent> for ChannelId {
             CommandAction::Message(m) => Some(m.channel_id),
             CommandAction::Interaction(i) => Some(i.channel_id),
         }
+    }
+}
+
+#[async_trait]
+impl EventExtractor<PermissionRequest> for ChannelId {
+    async fn extract_event(perm_req: &PermissionRequest) -> Option<Self> {
+        perm_req.channel_id.into()
     }
 }
 
@@ -214,6 +228,16 @@ impl EventExtractor<CommandEvent> for UserId {
             CommandAction::Message(m) => Some(m.author.id),
             CommandAction::Interaction(i) => Some(i.user.id),
         }
+    }
+}
+
+#[async_trait]
+impl EventExtractor<PermissionRequest> for UserId {
+    async fn extract_event(perm_req: &PermissionRequest) -> Option<Self> {
+        if let PermissionCheck::User(user_id) = perm_req.identification {
+            return Some(user_id);
+        }
+        None
     }
 }
 

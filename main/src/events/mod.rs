@@ -10,6 +10,7 @@ use utils::DiscordEvent;
 
 pub fn create_event_handler(shard_count: usize) -> EventManager {
     EventManagerBuilder::default()
+        .add_event(DiscordEvent::Ready, ready::shard_started)
         // Message Events
         .add_event(DiscordEvent::MessageCreate, message::create)
         .add_event(DiscordEvent::MessageDelete, message::snipe::deleted)

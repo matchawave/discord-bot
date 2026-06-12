@@ -5,7 +5,9 @@ pub mod extractors;
 pub mod global;
 pub mod guilds;
 pub mod handler;
+pub mod instance;
 pub mod processes;
+pub mod sharding;
 pub mod websocket;
 
 pub use macros::*;
@@ -21,7 +23,7 @@ use serenity::{
 
 use crate::{
     extractors::{ContextExtractor, Extractor},
-    guilds::Guilds,
+    guilds::{FakePerms, Guilds},
 };
 
 pub trait Extractable {
@@ -59,6 +61,7 @@ impl ShardData {
             data_vec.push(ShardData::default());
         }
         data.insert::<ShardData>(Pointer::new(data_vec));
+        data.insert::<StartedShards>(StartedShards::new(shards));
     }
 
     pub async fn get(shard_id: ShardId, data: &DataType) -> Option<ShardData> {
@@ -73,7 +76,7 @@ impl ShardData {
 #[async_trait]
 impl ContextExtractor for ShardData {
     async fn extract_context(ctx: &Context) -> Option<Self> {
-        ShardData::get(ctx.shard_id, &ctx.data).await
+        Self::get(ctx.shard_id, &ctx.data).await
     }
 }
 
@@ -84,5 +87,42 @@ where
 {
     async fn extract(ctx: &Context, _: &T, _: &Pointer<utils::Parser>) -> Option<Self> {
         ShardData::extract_context(ctx).await
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+struct StartedShards {
+    enabled: Pointer<Vec<ShardId>>,
+    total: usize,
+}
+
+impl TypeMapKey for StartedShards {
+    type Value = StartedShards;
+}
+
+impl StartedShards {
+    pub fn new(total: usize) -> Self {
+        Self {
+            total,
+            ..Default::default()
+        }
+    }
+}
+
+#[async_trait]
+impl ContextExtractor for StartedShards {
+    async fn extract_context(ctx: &Context) -> Option<Self> {
+        let data = ctx.data.read().await;
+        data.get::<Self>().cloned()
+    }
+}
+
+#[async_trait]
+impl<T> Extractor<T> for StartedShards
+where
+    T: Send + Sync + 'static,
+{
+    async fn extract(ctx: &Context, _: &T, _: &Pointer<utils::Parser>) -> Option<Self> {
+        Self::extract_context(ctx).await
     }
 }

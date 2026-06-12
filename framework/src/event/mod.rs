@@ -6,13 +6,12 @@ mod voice_states;
 
 use std::{collections::HashMap, sync::Arc};
 
-use colored::Colorize;
 use serenity::{
     all::{Context, Event, RawEventHandler},
     async_trait,
 };
 use tokio::sync::mpsc::{self, Receiver, Sender};
-use utils::{DiscordEvent, ElapsedTime, Parser, Pointer, ResponseError, error, info, warning};
+use utils::{DiscordEvent, Parser, Pointer, ResponseError, error, info, warning};
 
 use crate::{
     command::CommandEvent,
@@ -93,10 +92,7 @@ async fn worker(
     commands: Arc<CommandEventCallbacks>,
 ) {
     while let Some((ctx, event)) = receiver.recv().await {
-        let shard_text = format!("(Shard {})", ctx.shard_id.get()).bold().purple();
-        let seperator = "|".bold().white();
         let Some(event_name) = event.name() else {
-            // info!("{} {} event received with no name", shard_text, seperator,);
             continue;
         };
 
@@ -133,16 +129,7 @@ async fn worker(
         if let Some(funcs) = events.get(&name)
             && !funcs.is_empty()
         {
-            let elapsed = ElapsedTime::new();
             let parser = Pointer::new(Parser::new(ctx.shard_id));
-
-            info!(
-                "{} {} start {} event received",
-                shard_text,
-                seperator,
-                event_name.bold().underline().green()
-            );
-
             for func in funcs.iter() {
                 if let Some(Err(result)) = func.call(&ctx, &event, &parser).await {
                     match result {
@@ -152,14 +139,6 @@ async fn worker(
                     }
                 }
             }
-
-            info!(
-                "{} {} end {} event handled in {:?}ms",
-                shard_text.bold().purple(),
-                seperator,
-                event_name.bold().underline().green(),
-                elapsed.elapsed_ms()
-            );
         }
 
         handle_voice_state_update(&ctx, &event).await;

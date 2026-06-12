@@ -19,6 +19,15 @@ pub struct CommandEvent {
     pub action: CommandAction,
 }
 
+impl From<&CommandAction> for CommandEvent {
+    fn from(action: &CommandAction) -> Self {
+        CommandEvent {
+            name: "name_not_parsed".into(),
+            action: action.clone(),
+        }
+    }
+}
+
 impl From<&Message> for CommandAction {
     fn from(message: &Message) -> Self {
         CommandAction::Message(Box::new(message.clone()))

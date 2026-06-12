@@ -2,8 +2,8 @@ use serenity::all::{Context, Message, MessageUpdateEvent};
 use utils::{Parser, Pointer, ResponseError};
 
 use crate::{
-    command::{CommandEvent, CommandExecution, CommandManager},
-    extractors::ContextExtractor,
+    command::{CommandEvent, CommandExecution},
+    global::Commands,
 };
 
 pub async fn handle_edited_command(
@@ -23,8 +23,12 @@ pub async fn handle_command(
         return Ok(None);
     }
 
-    let Some(command_manager) = CommandManager::extract_context(ctx).await else {
-        return Err(ResponseError::new("CommandManager not found in TypeMap"));
+    let command_manager = {
+        let data = ctx.data.read().await;
+        let Some(command_manager) = data.get::<Commands>() else {
+            return Err(ResponseError::new("CommandManager not found in TypeMap"));
+        };
+        command_manager.clone()
     };
 
     command_manager.execute(ctx, msg).await

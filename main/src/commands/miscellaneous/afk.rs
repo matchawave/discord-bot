@@ -104,7 +104,7 @@ async fn interaction(
             )));
         }
         // For simplicity, we'll just use the default reason in this example
-        let path = format!("api/afk/user/config/{}", user_id);
+        let path = format!("api/user/{}/afk/config", user_id);
         let Some(result): Option<AfkConfigResponse> =
             (backend_http.post(&path, &new_config_body).await).map_err(|e| {
                 error!("Error updating AFK config for user {user_id}: {e}");
@@ -162,8 +162,8 @@ async fn clear_user_afk_statuses(
         && contains_user
     {
         map.write().await.clear_user(user_id);
-        let path = format!("api/afk/user/{}", user_id);
-        if let Err(e) = backend_http.delete::<()>(&path).await {
+        let path = format!("api/user/{}/afk", user_id);
+        if let Err(e) = backend_http.delete::<(), ()>(&path, &()).await {
             error!("Error clearing AFK statuses for user {user_id} after per_guild change: {e}");
         }
         info!(
@@ -212,7 +212,7 @@ async fn legacy(
     };
     let guild_id = per_guild.and_then(|pg| if pg { Some(guild_id) } else { None });
 
-    let path = format!("api/afk/user/{}", user_id);
+    let path = format!("api/user/{}/afk", user_id);
     let payload = NewAfkData {
         guild_id: guild_id.map(|g| g.to_string()),
         reason: reason.clone(),
@@ -253,7 +253,7 @@ async fn get_user_config(
     if let Some(config) = cache.get(None, user_id).await {
         Ok(config)
     } else {
-        let path = format!("api/afk/user/config/{}", user_id);
+        let path = format!("api/user/{}/afk/config", user_id);
         match backend_http.get::<AfkConfig>(&path).await {
             Ok(config) => {
                 if let Some(config) = &config {

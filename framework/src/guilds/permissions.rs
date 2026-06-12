@@ -101,44 +101,136 @@ impl FakePerms {
         write.insert(permission, Pointer::new(config));
     }
 
-    pub async fn add_user_to_permission(
+    pub async fn add_user_to_permissions(
         &self,
-        permission: BotPermission,
+        permissions: &[BotPermission],
         user_id: UserId,
     ) -> Result<(), String> {
         let read = self.0.read().await;
-        if let Some(perm_config_ptr) = read.get(&permission) {
-            let mut perm_config = perm_config_ptr.write().await;
-            if !perm_config.users.par_iter().any(|&id| id == user_id) {
-                perm_config.users.push(user_id);
-                return Ok(());
+        let mut list_of_already_perms = Vec::new();
+        for &permission in permissions {
+            if let Some(perm_config_ptr) = read.get(&permission) {
+                let mut perm_config = perm_config_ptr.write().await;
+                if !perm_config.users.par_iter().any(|&id| id == user_id) {
+                    perm_config.users.push(user_id);
+                } else {
+                    // Keep track of permissions that the user already has to return an error if all permissions were already present
+                    list_of_already_perms.push(permission);
+                }
+            } else {
+                return Err(format!(
+                    "Permission config not found for permission: {:?}",
+                    permission
+                ));
             }
-            return Err("User already has this permission".to_string());
         }
-        Err(format!(
-            "Permission config not found for permission: {:?}",
-            permission
-        ))
+        if list_of_already_perms.len() == permissions.len() {
+            return Err("User already has all of these permissions".to_string());
+        } else if !list_of_already_perms.is_empty() {
+            return Err(format!(
+                "User already has the following permissions: {:?}",
+                list_of_already_perms
+            ));
+        }
+        Ok(())
     }
 
     pub async fn add_role_to_permission(
         &self,
-        permission: BotPermission,
+        permission: &[BotPermission],
         role_id: RoleId,
     ) -> Result<(), String> {
         let read = self.0.read().await;
-        if let Some(perm_config_ptr) = read.get(&permission) {
-            let mut perm_config = perm_config_ptr.write().await;
-            if !perm_config.roles.par_iter().any(|r| *r == role_id) {
-                perm_config.roles.push(role_id);
-                return Ok(());
+        let mut list_of_already_perms = Vec::new();
+        for &perm in permission {
+            if let Some(perm_config_ptr) = read.get(&perm) {
+                let mut perm_config = perm_config_ptr.write().await;
+                if !perm_config.roles.par_iter().any(|&id| id == role_id) {
+                    perm_config.roles.push(role_id);
+                } else {
+                    // Keep track of permissions that the role already has to return an error if all permissions were already present
+                    list_of_already_perms.push(perm);
+                }
+            } else {
+                return Err(format!(
+                    "Permission config not found for permission: {:?}",
+                    perm
+                ));
             }
-            return Err("Role already has this permission".to_string());
         }
-        Err(format!(
-            "Permission config not found for permission: {:?}",
-            permission
-        ))
+        if list_of_already_perms.len() == permission.len() {
+            return Err("Role already has all of these permissions".to_string());
+        } else if !list_of_already_perms.is_empty() {
+            return Err(format!(
+                "Role already has the following permissions: {:?}",
+                list_of_already_perms
+            ));
+        }
+        Ok(())
+    }
+
+    pub async fn remove_user_from_permission(
+        &self,
+        permission: &[BotPermission],
+        user_id: UserId,
+    ) -> Result<(), String> {
+        let read = self.0.read().await;
+        let mut list_of_missing_perms = Vec::new();
+        for &perm in permission {
+            if let Some(perm_config_ptr) = read.get(&perm) {
+                let mut perm_config = perm_config_ptr.write().await;
+                if let Some(pos) = perm_config.users.iter().position(|&id| id == user_id) {
+                    perm_config.users.remove(pos);
+                } else {
+                    list_of_missing_perms.push(perm);
+                }
+            } else {
+                return Err(format!(
+                    "Permission config not found for permission: {:?}",
+                    perm
+                ));
+            }
+        }
+        if !list_of_missing_perms.is_empty() {
+            return Err(format!(
+                "User does not have the following permissions: {:?}",
+                list_of_missing_perms
+            ));
+        }
+        Ok(())
+    }
+
+    pub async fn remove_role_from_permission(
+        &self,
+        permission: &[BotPermission],
+        role_id: RoleId,
+    ) -> Result<(), String> {
+        let read = self.0.read().await;
+        let mut list_of_missing_perms = Vec::new();
+        for &perm in permission {
+            if let Some(perm_config_ptr) = read.get(&perm) {
+                let mut perm_config = perm_config_ptr.write().await;
+                if let Some(pos) = perm_config.roles.iter().position(|&id| id == role_id) {
+                    perm_config.roles.remove(pos);
+                } else {
+                    list_of_missing_perms.push(perm);
+                }
+            } else {
+                return Err(format!(
+                    "Permission config not found for permission: {:?}",
+                    perm
+                ));
+            }
+        }
+        if list_of_missing_perms.len() == permission.len() {
+            return Err("Role does not have any of these permissions".to_string());
+        } else if !list_of_missing_perms.is_empty() {
+            return Err(format!(
+                "Role does not have the following permissions: {:?}",
+                list_of_missing_perms
+            ));
+        }
+        Ok(())
     }
 }
 

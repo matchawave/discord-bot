@@ -16,7 +16,7 @@ fn main() {
     let env_file = match environment.as_str() {
         "staging" => ".env.staging",
         "production" => ".env.production",
-        _ => ".env.dev", // Default to .env for development or unknown environments
+        _ => ".env.development", // Default to .env for development or unknown environments
     };
 
     // Load the appropriate .env file
@@ -32,7 +32,7 @@ fn main() {
         }
     }
 
-    println!("cargo:rerun-if-changed=.env");
+    println!("cargo:rerun-if-changed=.env.development");
     println!("cargo:rerun-if-changed=.env.staging");
     println!("cargo:rerun-if-changed=.env.production");
     println!("cargo:rerun-if-env-changed=ENVIRONMENT");

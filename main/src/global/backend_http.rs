@@ -40,7 +40,7 @@ impl BackendHttpError {
     pub fn parse(
         method: &str,
         endpoint: &str,
-        data: &String,
+        data: &str,
         error: serde_json::error::Error,
     ) -> Self {
         BackendHttpError::Parse(format!(
@@ -56,19 +56,19 @@ impl BackendHttpError {
 impl fmt::Display for BackendHttpError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            BackendHttpError::Request(e) => write!(f, "Request error:{}", e),
+            BackendHttpError::Request(e) => write!(f, "Request error: {}", e),
             BackendHttpError::Status(e) => write!(f, "Status error: {}", e),
             BackendHttpError::Parse(e) => write!(f, "Parse: {}", e),
             BackendHttpError::NotJson(e) => write!(f, "Not JSON: {}", e),
-            BackendHttpError::Stream(e) => write!(f, "Stream {}", e),
+            BackendHttpError::Stream(e) => write!(f, "Stream:{}", e),
         }
     }
 }
 
 #[derive(Clone)]
 pub struct BackendHttp {
-    pub client: Arc<Client>,
-    pub api_url: String,
+    client: Arc<Client>,
+    api_url: String,
 }
 
 impl BackendHttp {
@@ -86,8 +86,22 @@ impl BackendHttp {
         }
     }
 
-    fn get_link<T: Into<String>>(&self, endpoint: T) -> String {
-        format!("{}://{}/{}", PROTOCOL, self.api_url, endpoint.into())
+    pub fn api(&self) -> BackendHttp {
+        BackendHttp {
+            client: self.client.clone(),
+            api_url: self.api_url.clone() + "/api",
+        }
+    }
+
+    pub fn cdn(&self) -> BackendHttp {
+        BackendHttp {
+            client: self.client.clone(),
+            api_url: self.api_url.clone() + "/cdn",
+        }
+    }
+
+    fn get_link(&self, endpoint: &str) -> String {
+        format!("{}://{}/{}", PROTOCOL, self.api_url, endpoint)
     }
 
     pub async fn get<U: DeserializeOwned>(
@@ -152,12 +166,13 @@ impl BackendHttp {
         }
     }
 
-    pub async fn delete<U: DeserializeOwned>(
+    pub async fn delete<T: Serialize, U: DeserializeOwned>(
         &self,
         endpoint: &str,
+        payload: &T,
     ) -> Result<Option<U>, BackendHttpError> {
         let url = self.get_link(endpoint);
-        match self.client.delete(&url).send().await {
+        match self.client.delete(&url).json(payload).send().await {
             Ok(resp) => {
                 if resp.status().is_server_error() || resp.status().is_client_error() {
                     let status = resp.status();
@@ -280,7 +295,7 @@ where
 }
 
 pub async fn set_shards(backend_http: &BackendHttp, count: u32) {
-    let path = format!("api/shards/started/{}", count);
+    let path = format!("api/shard/started/{}", count);
     match backend_http.post::<(), ()>(&path, &()).await {
         Ok(_) => info!("Set shard count to {}", count),
         Err(e) => error!("Failed to set shard count to {}: {}", count, e),

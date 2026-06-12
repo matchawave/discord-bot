@@ -61,9 +61,9 @@ async fn interaction(
         // Many valide options for date. (MM-DD, YYYY-MM-DD, MM/DD, YYYY/MM/DD, MM.DD, YYYY.MM.DD)
         let (month, day, year) = check_date_formats(date_str)?;
         let new_birthday = NewBirthday { month, day, year };
-        let path = format!("api/birthday/{}", user_id);
-        let response: Option<Birthday> =
-            (backend_http.post(&path, &new_birthday).await).map_err(|e| {
+        let path = format!("user/{}/birthday", user_id);
+        let response: Option<Birthday> = (backend_http.api().post(&path, &new_birthday).await)
+            .map_err(|e| {
                 error!("Error updating birthday for user {user_id}: {e}");
                 ResponseError::new_silent(format!(
                     "{}: Failed to update birthday",
@@ -133,7 +133,7 @@ async fn legacy(
     let birthday = match cache.get(None, target_id).await {
         Some(birthday) => birthday,
         None => {
-            let path = format!("api/birthday/{}", target_id);
+            let path = format!("api/user/{}/birthday", target_id);
             let birthday: Option<Birthday> = (backend_http.get(&path).await).map_err(|e| {
                 error!("Error fetching birthday for user {target_id}: {e}");
                 ResponseError::new_silent(format!(

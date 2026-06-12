@@ -24,7 +24,7 @@ pub async fn delete(
         }
     } else {
         let path = format!("api/guild/{}", guild_id);
-        match backend_http.delete::<()>(&path).await {
+        match backend_http.delete::<(), ()>(&path, &()).await {
             Ok(_) => info!("Disabled guild {guild_id}"),
             Err(e) => error!("Failed to disable guild {guild_id}: {e}"),
         }

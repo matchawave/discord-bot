@@ -36,7 +36,7 @@ impl ProcessLoop for AfkInstance {
             backend_http
         };
 
-        match backend_http.stream::<AfkStatus>("api/afk").await {
+        match backend_http.api().stream::<AfkStatus>("afk").await {
             Ok(mut stream) => {
                 let mut count = 0;
                 while let Some(afk_status) = stream.next().await {

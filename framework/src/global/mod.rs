@@ -1,4 +1,4 @@
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use crate::{
     command::CommandManager,
@@ -14,7 +14,7 @@ use utils::{Pointer, error};
 
 pub struct Commands;
 impl TypeMapKey for Commands {
-    type Value = CommandManager;
+    type Value = Arc<CommandManager>;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
